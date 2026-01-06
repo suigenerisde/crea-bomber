@@ -19,11 +19,12 @@ This phase establishes the technical foundation for CreaBomber. We initialize a 
   - DeviceRegistration interface for client handshake
   - ✅ **Completed**: Created comprehensive type definitions including MessageType enum, Device/Message interfaces, MessagePayload and DeviceRegistration for WebSocket, plus DeviceRow/MessageRow types for SQLite database mapping.
 
-- [ ] Create SQLite database layer in src/lib/db.ts:
+- [x] Create SQLite database layer in src/lib/db.ts:
   - Initialize better-sqlite3 with database file at data/creabomber.db
   - Create devices table: id TEXT PRIMARY KEY, name TEXT, hostname TEXT, status TEXT DEFAULT 'offline', last_seen INTEGER, created_at INTEGER
   - Create messages table: id TEXT PRIMARY KEY, type TEXT, content TEXT, image_url TEXT, video_url TEXT, audio_url TEXT, audio_autoplay INTEGER DEFAULT 0, target_devices TEXT (JSON), status TEXT DEFAULT 'pending', created_at INTEGER
   - Export functions: getDevices(), getDevice(id), createDevice(), updateDeviceStatus(), getMessages(), getMessage(id), createMessage(), updateMessageStatus()
+  - ✅ **Completed**: Created comprehensive SQLite database layer with better-sqlite3. Includes WAL mode for concurrent access, both tables with proper schemas, all required CRUD functions plus utility functions (getDeviceCount, getOnlineDevices, upsertDevice). Added data directory with .gitkeep and .gitignore entries for database files.
 
 - [ ] Create mock devices seed data in src/lib/mock-devices.ts:
   - Define 3 mock devices: "MacBook Pro - Thilo", "Mac Studio - Office", "MacBook Air - Mobile"
