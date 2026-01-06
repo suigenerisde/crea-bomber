@@ -11,12 +11,13 @@ This phase establishes the technical foundation for CreaBomber. We initialize a 
   - Verify installation by running `npm run dev` briefly
   - ✅ **Completed**: Next.js 16.1.1 initialized with TypeScript, Tailwind, ESLint. All dependencies installed (socket.io, better-sqlite3, uuid, date-fns, lucide-react, clsx). Dev server verified working on localhost:3000.
 
-- [ ] Create TypeScript type definitions in src/types/index.ts:
+- [x] Create TypeScript type definitions in src/types/index.ts:
   - MessageType enum: TEXT, TEXT_IMAGE, VIDEO, AUDIO
   - Device interface: id, name, hostname, status ('online' | 'offline'), lastSeen, createdAt
   - Message interface: id, type, content, imageUrl?, videoUrl?, audioUrl?, audioAutoplay?, targetDevices (string[]), status ('pending' | 'sent' | 'delivered'), createdAt
   - MessagePayload interface for WebSocket transmission
   - DeviceRegistration interface for client handshake
+  - ✅ **Completed**: Created comprehensive type definitions including MessageType enum, Device/Message interfaces, MessagePayload and DeviceRegistration for WebSocket, plus DeviceRow/MessageRow types for SQLite database mapping.
 
 - [ ] Create SQLite database layer in src/lib/db.ts:
   - Initialize better-sqlite3 with database file at data/creabomber.db
