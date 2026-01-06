@@ -3,7 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "ts-node --project tsconfig.server.json -r tsconfig-paths/register server.ts",
+    "dev:next": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "eslint"
@@ -31,6 +32,7 @@
     "eslint-config-next": "16.1.1",
     "tailwindcss": "^4",
     "ts-node": "^10.9.2",
+    "tsconfig-paths": "^4.2.0",
     "typescript": "^5"
   }
 }

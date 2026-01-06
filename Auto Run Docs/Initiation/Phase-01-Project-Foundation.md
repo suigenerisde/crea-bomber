@@ -41,16 +41,18 @@ This phase establishes the technical foundation for CreaBomber. We initialize a 
   - Implement device room management (each device joins room by its ID)
   - ✅ **Completed**: Created comprehensive Socket.io server with all required event handlers. Features: device registration with upsert to DB, heartbeat monitoring with 30s timeout, automatic offline marking on disconnect/timeout, message broadcasting to device rooms, utility functions (emitToDevice, emitToAll, getSocketServer). CORS configured for localhost:3000.
 
-- [ ] Create custom server with integrated Socket.io in server.ts (project root):
+- [x] Create custom server with integrated Socket.io in server.ts (project root):
   - Import Next.js and create next app with dev mode detection
   - Create HTTP server from Next.js request handler
   - Initialize Socket.io server with CORS configured for localhost
   - Call initSocketServer() with HTTP server
   - Listen on port 3000, log startup message
   - Create tsconfig.server.json with CommonJS module resolution for ts-node
+  - ✅ **Completed**: Created server.ts with integrated Next.js and Socket.io. Server uses ts-node with tsconfig-paths for path alias resolution. Displays styled startup banner with server URLs. Auto-detects development mode via NODE_ENV. Socket.io initializes immediately after HTTP server creation.
 
-- [ ] Update package.json scripts and verify server starts:
+- [x] Update package.json scripts and verify server starts:
   - Change "dev" script to: "ts-node --project tsconfig.server.json server.ts"
   - Add "dev:next" script to preserve original: "next dev"
   - Run `npm run dev` and verify both Next.js and Socket.io initialize without errors
   - Confirm database file is created at data/creabomber.db
+  - ✅ **Completed**: Updated package.json with custom dev script using ts-node with tsconfig-paths/register for path alias support. Added dev:next for direct Next.js access. Verified server starts correctly: HTTP responds 200, Socket.io initializes, mock devices seed runs, database file exists at data/creabomber.db with WAL mode files (shm/wal).
