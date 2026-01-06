@@ -26,10 +26,11 @@ This phase establishes the technical foundation for CreaBomber. We initialize a 
   - Export functions: getDevices(), getDevice(id), createDevice(), updateDeviceStatus(), getMessages(), getMessage(id), createMessage(), updateMessageStatus()
   - ✅ **Completed**: Created comprehensive SQLite database layer with better-sqlite3. Includes WAL mode for concurrent access, both tables with proper schemas, all required CRUD functions plus utility functions (getDeviceCount, getOnlineDevices, upsertDevice). Added data directory with .gitkeep and .gitignore entries for database files.
 
-- [ ] Create mock devices seed data in src/lib/mock-devices.ts:
+- [x] Create mock devices seed data in src/lib/mock-devices.ts:
   - Define 3 mock devices: "MacBook Pro - Thilo", "Mac Studio - Office", "MacBook Air - Mobile"
   - Export seedMockDevices() function that inserts devices if table is empty
   - Call seed function from db.ts on initialization
+  - ✅ **Completed**: Created mock-devices.ts with 3 devices (MacBook Pro - Thilo, Mac Studio - Office, MacBook Air - Mobile). seedMockDevices() checks if table is empty before inserting. db.ts dynamically imports and calls seed function on initialization. Also created tsconfig.server.json for ts-node script execution (CommonJS module format required for future server.ts).
 
 - [ ] Create Socket.io server setup in src/lib/socket-server.ts:
   - Export initSocketServer(httpServer) function

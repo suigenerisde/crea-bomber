@@ -255,3 +255,8 @@ export function getOnlineDevices(): Device[] {
 
 // Export database instance for advanced usage
 export { db };
+
+// Seed mock devices on initialization
+import('./mock-devices').then(({ seedMockDevices }) => {
+  seedMockDevices();
+});
