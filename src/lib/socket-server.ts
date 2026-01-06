@@ -1,0 +1,258 @@
+/**
+ * CreaBomber Socket.io Server
+ * Handles real-time communication between dashboard and display devices
+ */
+
+import { Server as HttpServer } from 'http';
+import { Server, Socket } from 'socket.io';
+import {
+  getDevices,
+  updateDeviceStatus,
+  upsertDevice,
+  createMessage,
+  updateMessageStatus,
+} from './db';
+import type {
+  DeviceRegistration,
+  MessagePayload,
+  Device,
+  MessageType,
+} from '@/types';
+
+// Store socket-to-device mapping
+const socketDeviceMap = new Map<string, string>();
+
+// Timeout for marking devices offline (30 seconds without heartbeat)
+const OFFLINE_TIMEOUT = 30000;
+
+// Track heartbeat timeouts per device
+const heartbeatTimeouts = new Map<string, NodeJS.Timeout>();
+
+let io: Server | null = null;
+
+/**
+ * Initialize Socket.io server with the given HTTP server
+ */
+export function initSocketServer(httpServer: HttpServer): Server {
+  io = new Server(httpServer, {
+    cors: {
+      origin: ['http://localhost:3000', 'http://127.0.0.1:3000'],
+      methods: ['GET', 'POST'],
+    },
+  });
+
+  io.on('connection', (socket: Socket) => {
+    console.log(`[Socket] Client connected: ${socket.id}`);
+
+    // Handle device registration
+    socket.on('device:register', (data: DeviceRegistration) => {
+      handleDeviceRegister(socket, data);
+    });
+
+    // Handle heartbeat
+    socket.on('device:heartbeat', () => {
+      handleDeviceHeartbeat(socket);
+    });
+
+    // Handle message sending
+    socket.on('message:send', (payload: MessagePayload) => {
+      handleMessageSend(socket, payload);
+    });
+
+    // Handle disconnection
+    socket.on('disconnect', () => {
+      handleDisconnect(socket);
+    });
+  });
+
+  console.log('[Socket] Socket.io server initialized');
+  return io;
+}
+
+/**
+ * Handle device registration
+ * - Upsert device in database
+ * - Join device to its room
+ * - Broadcast updated device list
+ */
+function handleDeviceRegister(socket: Socket, data: DeviceRegistration): void {
+  const { deviceId, deviceName, hostname } = data;
+
+  console.log(`[Socket] Device registering: ${deviceName} (${deviceId})`);
+
+  // Upsert device in database (creates if new, updates if existing)
+  const device = upsertDevice(deviceId, deviceName, hostname);
+
+  // Map socket to device
+  socketDeviceMap.set(socket.id, deviceId);
+
+  // Join device room
+  socket.join(`device:${deviceId}`);
+
+  // Clear any existing offline timeout
+  clearDeviceTimeout(deviceId);
+
+  // Start heartbeat timeout
+  resetHeartbeatTimeout(deviceId);
+
+  // Notify client of successful registration
+  socket.emit('device:registered', { device });
+
+  // Broadcast updated device list to all clients
+  broadcastDeviceList();
+}
+
+/**
+ * Handle device heartbeat
+ * - Update lastSeen timestamp
+ * - Reset offline timeout
+ */
+function handleDeviceHeartbeat(socket: Socket): void {
+  const deviceId = socketDeviceMap.get(socket.id);
+
+  if (!deviceId) {
+    console.warn(`[Socket] Heartbeat from unregistered socket: ${socket.id}`);
+    return;
+  }
+
+  // Update device status and lastSeen
+  updateDeviceStatus(deviceId, 'online', true);
+
+  // Reset heartbeat timeout
+  resetHeartbeatTimeout(deviceId);
+}
+
+/**
+ * Handle message sending
+ * - Save message to database
+ * - Broadcast to target device rooms
+ * - Update message status
+ */
+function handleMessageSend(socket: Socket, payload: MessagePayload): void {
+  const { id, type, content, targetDevices, imageUrl, videoUrl, audioUrl, audioAutoplay } = payload;
+
+  console.log(`[Socket] Message received: ${id} -> ${targetDevices.join(', ')}`);
+
+  // Save message to database
+  const message = createMessage(type as MessageType, content, targetDevices, {
+    imageUrl,
+    videoUrl,
+    audioUrl,
+    audioAutoplay,
+  });
+
+  // Emit to each target device room
+  for (const deviceId of targetDevices) {
+    if (io) {
+      io.to(`device:${deviceId}`).emit('message:receive', {
+        ...payload,
+        id: message.id,
+        timestamp: message.createdAt.getTime(),
+      });
+    }
+  }
+
+  // Update message status to sent
+  updateMessageStatus(message.id, 'sent');
+
+  // Notify sender of successful send
+  socket.emit('message:sent', { messageId: message.id });
+}
+
+/**
+ * Handle socket disconnection
+ * - Mark device as offline after timeout
+ * - Broadcast updated device list
+ */
+function handleDisconnect(socket: Socket): void {
+  const deviceId = socketDeviceMap.get(socket.id);
+
+  console.log(`[Socket] Client disconnected: ${socket.id}`);
+
+  if (deviceId) {
+    // Don't immediately mark offline - wait for timeout
+    // This allows for brief reconnections
+    console.log(`[Socket] Device ${deviceId} disconnected, starting offline timeout`);
+
+    // Set timeout to mark device offline
+    const timeout = setTimeout(() => {
+      markDeviceOffline(deviceId);
+    }, OFFLINE_TIMEOUT);
+
+    heartbeatTimeouts.set(deviceId, timeout);
+
+    // Clean up socket mapping
+    socketDeviceMap.delete(socket.id);
+  }
+}
+
+/**
+ * Mark a device as offline and broadcast update
+ */
+function markDeviceOffline(deviceId: string): void {
+  console.log(`[Socket] Marking device offline: ${deviceId}`);
+
+  updateDeviceStatus(deviceId, 'offline', false);
+  clearDeviceTimeout(deviceId);
+  broadcastDeviceList();
+}
+
+/**
+ * Reset the heartbeat timeout for a device
+ */
+function resetHeartbeatTimeout(deviceId: string): void {
+  clearDeviceTimeout(deviceId);
+
+  const timeout = setTimeout(() => {
+    console.log(`[Socket] Heartbeat timeout for device: ${deviceId}`);
+    markDeviceOffline(deviceId);
+  }, OFFLINE_TIMEOUT);
+
+  heartbeatTimeouts.set(deviceId, timeout);
+}
+
+/**
+ * Clear any existing timeout for a device
+ */
+function clearDeviceTimeout(deviceId: string): void {
+  const existing = heartbeatTimeouts.get(deviceId);
+  if (existing) {
+    clearTimeout(existing);
+    heartbeatTimeouts.delete(deviceId);
+  }
+}
+
+/**
+ * Broadcast the current device list to all connected clients
+ */
+function broadcastDeviceList(): void {
+  if (!io) return;
+
+  const devices = getDevices();
+  io.emit('devices:update', { devices });
+}
+
+/**
+ * Get the Socket.io server instance
+ */
+export function getSocketServer(): Server | null {
+  return io;
+}
+
+/**
+ * Emit an event to a specific device
+ */
+export function emitToDevice(deviceId: string, event: string, data: unknown): void {
+  if (io) {
+    io.to(`device:${deviceId}`).emit(event, data);
+  }
+}
+
+/**
+ * Emit an event to all connected clients
+ */
+export function emitToAll(event: string, data: unknown): void {
+  if (io) {
+    io.emit(event, data);
+  }
+}
