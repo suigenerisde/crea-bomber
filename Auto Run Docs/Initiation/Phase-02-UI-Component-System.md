@@ -44,7 +44,8 @@ This phase creates the reusable UI component library and application layout stru
   - Verify navigation between pages works correctly
   ✅ Created all 4 placeholder pages with consistent styling. Dashboard (/) shows welcome message, Compose (/compose), Devices (/devices), and History (/history) all render with proper headings. Build verified all routes: /, /compose, /devices, /history are recognized and statically generated
 
-- [ ] Create device-related components in src/components/devices/:
+- [x] Create device-related components in src/components/devices/:
   - DeviceCard.tsx: displays device name, hostname (muted), status badge (online/offline), last seen timestamp (relative with date-fns), subtle hover effect
   - DeviceList.tsx: grid layout (responsive 1-3 columns) of DeviceCards, optional online-only filter toggle, empty state message
   - DeviceSelector.tsx: checkbox list of devices for message targeting, select all/none buttons, shows online count, disabled state for offline devices
+  ✅ Created all 3 device components with full TypeScript support, barrel export in index.ts. DeviceCard shows name/hostname/status badge/relative time. DeviceList has responsive grid (1-3 cols) and online-only toggle. DeviceSelector has checkbox list with select all/none, disabled state for offline devices. Build verified successfully.
