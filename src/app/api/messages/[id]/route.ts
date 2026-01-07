@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getMessage, getDevice } from '@/lib/db';
+import { apiError, NotFoundError } from '@/lib/errors';
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -16,10 +17,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     const message = getMessage(id);
 
     if (!message) {
-      return NextResponse.json(
-        { error: 'Message not found' },
-        { status: 404 }
-      );
+      return apiError(new NotFoundError('Message', id), `GET /api/messages/${id}`);
     }
 
     // Enrich with device details
@@ -47,10 +45,6 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       },
     });
   } catch (error) {
-    console.error('[API] Failed to fetch message:', error);
-    return NextResponse.json(
-      { error: 'Failed to fetch message' },
-      { status: 500 }
-    );
+    return apiError(error, 'GET /api/messages/[id]');
   }
 }

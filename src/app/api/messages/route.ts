@@ -8,6 +8,24 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db, getMessage } from '@/lib/db';
 import { v4 as uuidv4 } from 'uuid';
 import type { Message, MessageRow, MessageType, MessageStatus } from '@/types';
+import {
+  apiError,
+  ValidationError,
+  DatabaseError,
+  validateRequired,
+  validateString,
+  validateArray,
+  validateEnum,
+  validateUrl,
+  combineValidation,
+  validationResultToError,
+  safeJsonParse,
+} from '@/lib/errors';
+
+// Valid message types
+const VALID_MESSAGE_TYPES = ['TEXT', 'TEXT_IMAGE', 'VIDEO', 'AUDIO'] as const;
+const MAX_CONTENT_LENGTH = 10000;
+const MAX_URL_LENGTH = 2048;
 
 // Helper: Convert MessageRow to Message
 function rowToMessage(row: MessageRow): Message {
@@ -25,13 +43,66 @@ function rowToMessage(row: MessageRow): Message {
   };
 }
 
+// Validate query parameters
+function validateQueryParams(searchParams: URLSearchParams): {
+  limit: number;
+  offset: number;
+  type: string | null;
+  search: string | null;
+  error: ValidationError | null;
+} {
+  const limitStr = searchParams.get('limit') ?? '20';
+  const offsetStr = searchParams.get('offset') ?? '0';
+  const type = searchParams.get('type');
+  const search = searchParams.get('search');
+
+  const limit = parseInt(limitStr, 10);
+  const offset = parseInt(offsetStr, 10);
+
+  if (isNaN(limit) || limit < 1 || limit > 100) {
+    return {
+      limit: 20,
+      offset: 0,
+      type: null,
+      search: null,
+      error: new ValidationError('limit must be a number between 1 and 100'),
+    };
+  }
+
+  if (isNaN(offset) || offset < 0) {
+    return {
+      limit: 20,
+      offset: 0,
+      type: null,
+      search: null,
+      error: new ValidationError('offset must be a non-negative number'),
+    };
+  }
+
+  if (type && !VALID_MESSAGE_TYPES.includes(type as typeof VALID_MESSAGE_TYPES[number])) {
+    return {
+      limit,
+      offset,
+      type: null,
+      search: null,
+      error: new ValidationError(
+        `type must be one of: ${VALID_MESSAGE_TYPES.join(', ')}`
+      ),
+    };
+  }
+
+  return { limit, offset, type, search, error: null };
+}
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const limit = Math.min(parseInt(searchParams.get('limit') ?? '20', 10), 100);
-    const offset = parseInt(searchParams.get('offset') ?? '0', 10);
-    const type = searchParams.get('type');
-    const search = searchParams.get('search');
+    const { limit, offset, type, search, error: queryError } =
+      validateQueryParams(searchParams);
+
+    if (queryError) {
+      return apiError(queryError, 'GET /api/messages');
+    }
 
     // Build query with optional filters
     let sql = 'SELECT * FROM messages';
@@ -77,75 +148,110 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error('[API] Failed to fetch messages:', error);
-    return NextResponse.json(
-      { error: 'Failed to fetch messages' },
-      { status: 500 }
-    );
+    return apiError(error, 'GET /api/messages');
   }
+}
+
+// Request body interface
+interface CreateMessageBody {
+  type: string;
+  content: string;
+  targetDevices: string[];
+  imageUrl?: string;
+  videoUrl?: string;
+  audioUrl?: string;
+  audioAutoplay?: boolean;
 }
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
+    // Parse JSON body safely
+    const { data: body, error: parseError } =
+      await safeJsonParse<CreateMessageBody>(request);
+
+    if (parseError || !body) {
+      return apiError(parseError ?? new ValidationError('Request body is required'), 'POST /api/messages');
+    }
+
     const { type, content, targetDevices, imageUrl, videoUrl, audioUrl, audioAutoplay } = body;
 
-    // Validate required fields
-    if (!type || !content || !targetDevices || !Array.isArray(targetDevices)) {
-      return NextResponse.json(
-        { error: 'Type, content, and targetDevices array are required' },
-        { status: 400 }
+    // Comprehensive validation
+    const validation = combineValidation(
+      validateRequired(type, 'type'),
+      validateRequired(content, 'content'),
+      validateRequired(targetDevices, 'targetDevices'),
+      validateEnum(type, 'type', [...VALID_MESSAGE_TYPES]),
+      validateString(content, 'content', { minLength: 1, maxLength: MAX_CONTENT_LENGTH }),
+      validateArray(targetDevices, 'targetDevices', { minLength: 1 })
+    );
+
+    // Type-specific validation
+    if (type === 'TEXT_IMAGE') {
+      const imageValidation = combineValidation(
+        validateRequired(imageUrl, 'imageUrl'),
+        validateUrl(imageUrl, 'imageUrl'),
+        validateString(imageUrl ?? '', 'imageUrl', { maxLength: MAX_URL_LENGTH })
       );
+      validation.errors.push(...imageValidation.errors);
     }
 
-    // Validate message type
-    const validTypes = ['TEXT', 'TEXT_IMAGE', 'VIDEO', 'AUDIO'];
-    if (!validTypes.includes(type)) {
-      return NextResponse.json(
-        { error: 'Invalid message type' },
-        { status: 400 }
+    if (type === 'VIDEO') {
+      const videoValidation = combineValidation(
+        validateRequired(videoUrl, 'videoUrl'),
+        validateUrl(videoUrl, 'videoUrl'),
+        validateString(videoUrl ?? '', 'videoUrl', { maxLength: MAX_URL_LENGTH })
       );
+      validation.errors.push(...videoValidation.errors);
     }
 
-    if (targetDevices.length === 0) {
-      return NextResponse.json(
-        { error: 'At least one target device is required' },
-        { status: 400 }
+    if (type === 'AUDIO') {
+      const audioValidation = combineValidation(
+        validateRequired(audioUrl, 'audioUrl'),
+        validateUrl(audioUrl, 'audioUrl'),
+        validateString(audioUrl ?? '', 'audioUrl', { maxLength: MAX_URL_LENGTH })
       );
+      validation.errors.push(...audioValidation.errors);
+    }
+
+    // Return validation errors if any
+    const validationError = validationResultToError(validation);
+    if (validationError) {
+      return apiError(validationError, 'POST /api/messages');
     }
 
     // Create message in database
     const id = uuidv4();
     const now = Date.now();
 
-    const stmt = db.prepare(`
-      INSERT INTO messages (id, type, content, image_url, video_url, audio_url, audio_autoplay, target_devices, status, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)
-    `);
+    try {
+      const stmt = db.prepare(`
+        INSERT INTO messages (id, type, content, image_url, video_url, audio_url, audio_autoplay, target_devices, status, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)
+      `);
 
-    stmt.run(
-      id,
-      type,
-      content,
-      imageUrl ?? null,
-      videoUrl ?? null,
-      audioUrl ?? null,
-      audioAutoplay ? 1 : 0,
-      JSON.stringify(targetDevices),
-      now
-    );
+      stmt.run(
+        id,
+        type,
+        content,
+        imageUrl ?? null,
+        videoUrl ?? null,
+        audioUrl ?? null,
+        audioAutoplay ? 1 : 0,
+        JSON.stringify(targetDevices),
+        now
+      );
+    } catch (dbError) {
+      throw new DatabaseError('Failed to save message to database', dbError);
+    }
 
     const message = getMessage(id);
 
-    // Note: WebSocket broadcast is handled by the socket server when clients connect
-    // The dashboard will use the socket to send messages to devices
+    if (!message) {
+      throw new DatabaseError('Message was created but could not be retrieved');
+    }
 
     return NextResponse.json({ message }, { status: 201 });
   } catch (error) {
-    console.error('[API] Failed to create message:', error);
-    return NextResponse.json(
-      { error: 'Failed to create message' },
-      { status: 500 }
-    );
+    return apiError(error, 'POST /api/messages');
   }
 }

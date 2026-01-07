@@ -1,6 +1,7 @@
 /**
  * CreaBomber - useMessages Hook
  * Fetches message history, creates messages, and subscribes to real-time updates
+ * Enhanced with retry logic and error handling
  */
 
 'use client';
@@ -8,6 +9,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Socket } from 'socket.io-client';
 import type { Message, MessageType } from '@/types';
+import { fetchWithRetry, postWithRetry, messageQueue } from '@/lib/fetch-with-retry';
+import { getErrorMessage } from '@/lib/errors';
 
 interface MessagesApiResponse {
   messages: Message[];
@@ -17,6 +20,10 @@ interface MessagesApiResponse {
     offset: number;
     hasMore: boolean;
   };
+}
+
+interface CreateMessageResponse {
+  message: Message;
 }
 
 interface CreateMessagePayload {
@@ -35,6 +42,8 @@ interface UseMessagesOptions {
   initialLimit?: number;
   type?: MessageType;
   search?: string;
+  enableRetry?: boolean;
+  enableOfflineQueue?: boolean;
 }
 
 interface UseMessagesReturn {
@@ -51,17 +60,28 @@ interface UseMessagesReturn {
   loadMore: () => Promise<void>;
   createMessage: (payload: CreateMessagePayload) => Promise<Message>;
   creating: boolean;
+  queuedCount: number;
+  processQueue: () => Promise<void>;
 }
 
 const DEFAULT_LIMIT = 20;
 
 export function useMessages(options: UseMessagesOptions = { socket: null }): UseMessagesReturn {
-  const { socket, autoFetch = true, initialLimit = DEFAULT_LIMIT, type, search } = options;
+  const {
+    socket,
+    autoFetch = true,
+    initialLimit = DEFAULT_LIMIT,
+    type,
+    search,
+    enableRetry = true,
+    enableOfflineQueue = true,
+  } = options;
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [queuedCount, setQueuedCount] = useState(0);
   const [pagination, setPagination] = useState({
     total: 0,
     limit: initialLimit,
@@ -69,6 +89,11 @@ export function useMessages(options: UseMessagesOptions = { socket: null }): Use
     hasMore: false,
   });
   const mountedRef = useRef(true);
+
+  // Update queued count on mount
+  useEffect(() => {
+    setQueuedCount(messageQueue.getLength());
+  }, []);
 
   // Build query string from params
   const buildQueryString = useCallback(
@@ -89,7 +114,7 @@ export function useMessages(options: UseMessagesOptions = { socket: null }): Use
     createdAt: new Date(msg.createdAt),
   });
 
-  // Fetch messages from API
+  // Fetch messages from API with retry logic
   const fetchMessages = useCallback(
     async (offset: number = 0, append: boolean = false) => {
       try {
@@ -99,16 +124,31 @@ export function useMessages(options: UseMessagesOptions = { socket: null }): Use
         setError(null);
 
         const queryString = buildQueryString(offset);
-        const response = await fetch(`/api/messages?${queryString}`);
+        const result = await fetchWithRetry<MessagesApiResponse>(
+          `/api/messages?${queryString}`,
+          { method: 'GET' },
+          enableRetry
+            ? {
+                maxRetries: 3,
+                onRetry: (attempt, err, delay) => {
+                  console.log(
+                    `[useMessages] Retry ${attempt}: ${err.message}, waiting ${delay}ms`
+                  );
+                },
+              }
+            : { maxRetries: 0 }
+        );
 
-        if (!response.ok) {
-          throw new Error(`Failed to fetch messages: ${response.statusText}`);
+        if (result.error) {
+          throw result.error;
         }
 
-        const data: MessagesApiResponse = await response.json();
+        if (!result.data) {
+          throw new Error('No data received from API');
+        }
 
         if (mountedRef.current) {
-          const parsedMessages = data.messages.map(parseMessage);
+          const parsedMessages = result.data.messages.map(parseMessage);
 
           if (append) {
             setMessages((prev) => [...prev, ...parsedMessages]);
@@ -116,11 +156,11 @@ export function useMessages(options: UseMessagesOptions = { socket: null }): Use
             setMessages(parsedMessages);
           }
 
-          setPagination(data.pagination);
+          setPagination(result.data.pagination);
         }
       } catch (err) {
         if (mountedRef.current) {
-          const message = err instanceof Error ? err.message : 'Unknown error';
+          const message = getErrorMessage(err);
           setError(message);
           console.error('[useMessages] Fetch error:', message);
         }
@@ -130,7 +170,7 @@ export function useMessages(options: UseMessagesOptions = { socket: null }): Use
         }
       }
     },
-    [buildQueryString]
+    [buildQueryString, enableRetry]
   );
 
   // Refresh - reload from beginning
@@ -146,28 +186,76 @@ export function useMessages(options: UseMessagesOptions = { socket: null }): Use
     await fetchMessages(nextOffset, true);
   }, [pagination, loading, fetchMessages]);
 
-  // Create a new message via API
+  // Create a new message via API with retry logic
   const createMessage = useCallback(
     async (payload: CreateMessagePayload): Promise<Message> => {
       setCreating(true);
       setError(null);
 
       try {
-        const response = await fetch('/api/messages', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(payload),
-        });
+        const result = await postWithRetry<CreateMessageResponse>(
+          '/api/messages',
+          payload,
+          enableRetry
+            ? {
+                maxRetries: 3,
+                onRetry: (attempt, err, delay) => {
+                  console.log(
+                    `[useMessages] Create retry ${attempt}: ${err.message}, waiting ${delay}ms`
+                  );
+                },
+              }
+            : { maxRetries: 0 }
+        );
 
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}));
-          throw new Error(errorData.error || `Failed to create message: ${response.statusText}`);
+        if (result.error) {
+          // If offline and queue is enabled, add to queue
+          if (
+            enableOfflineQueue &&
+            (result.error.message.includes('fetch failed') ||
+              result.error.message.includes('Network') ||
+              result.error.message.includes('offline'))
+          ) {
+            messageQueue.add(
+              '/api/messages',
+              {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+              },
+              payload
+            );
+            setQueuedCount(messageQueue.getLength());
+
+            // Create a temporary local message
+            const tempMessage: Message = {
+              id: `temp-${Date.now()}`,
+              type: payload.type,
+              content: payload.content,
+              targetDevices: payload.targetDevices,
+              imageUrl: payload.imageUrl,
+              videoUrl: payload.videoUrl,
+              audioUrl: payload.audioUrl,
+              audioAutoplay: payload.audioAutoplay,
+              status: 'pending',
+              createdAt: new Date(),
+            };
+
+            if (mountedRef.current) {
+              setMessages((prev) => [tempMessage, ...prev]);
+              setPagination((prev) => ({ ...prev, total: prev.total + 1 }));
+            }
+
+            return tempMessage;
+          }
+
+          throw result.error;
         }
 
-        const data = await response.json();
-        const newMessage = parseMessage(data.message);
+        if (!result.data?.message) {
+          throw new Error('No message returned from API');
+        }
+
+        const newMessage = parseMessage(result.data.message);
 
         // Optimistically add to the list
         if (mountedRef.current) {
@@ -192,7 +280,7 @@ export function useMessages(options: UseMessagesOptions = { socket: null }): Use
 
         return newMessage;
       } catch (err) {
-        const message = err instanceof Error ? err.message : 'Unknown error';
+        const message = getErrorMessage(err);
         if (mountedRef.current) {
           setError(message);
         }
@@ -203,8 +291,24 @@ export function useMessages(options: UseMessagesOptions = { socket: null }): Use
         }
       }
     },
-    [socket]
+    [socket, enableRetry, enableOfflineQueue]
   );
+
+  // Process queued messages when back online
+  const processQueue = useCallback(async () => {
+    await messageQueue.processQueue(
+      (id) => {
+        console.log(`[useMessages] Queued message ${id} sent successfully`);
+        setQueuedCount(messageQueue.getLength());
+        // Refresh to get updated message list
+        refresh();
+      },
+      (id, err) => {
+        console.error(`[useMessages] Failed to send queued message ${id}:`, err);
+        setQueuedCount(messageQueue.getLength());
+      }
+    );
+  }, [refresh]);
 
   // Initial fetch
   useEffect(() => {
@@ -242,12 +346,21 @@ export function useMessages(options: UseMessagesOptions = { socket: null }): Use
       }
     };
 
+    // Process queue when socket reconnects
+    const handleConnect = () => {
+      if (messageQueue.getLength() > 0) {
+        processQueue();
+      }
+    };
+
     socket.on('message:sent', handleMessageSent);
+    socket.on('connect', handleConnect);
 
     return () => {
       socket.off('message:sent', handleMessageSent);
+      socket.off('connect', handleConnect);
     };
-  }, [socket]);
+  }, [socket, processQueue]);
 
   return {
     messages,
@@ -258,5 +371,7 @@ export function useMessages(options: UseMessagesOptions = { socket: null }): Use
     loadMore,
     createMessage,
     creating,
+    queuedCount,
+    processQueue,
   };
 }

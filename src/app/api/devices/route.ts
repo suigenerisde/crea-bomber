@@ -6,39 +6,80 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getDevices, createDevice } from '@/lib/db';
+import {
+  apiError,
+  DatabaseError,
+  validateRequired,
+  validateString,
+  combineValidation,
+  validationResultToError,
+  safeJsonParse,
+} from '@/lib/errors';
+
+const MAX_NAME_LENGTH = 100;
+const MAX_HOSTNAME_LENGTH = 255;
 
 export async function GET() {
   try {
     const devices = getDevices();
     return NextResponse.json({ devices });
   } catch (error) {
-    console.error('[API] Failed to fetch devices:', error);
-    return NextResponse.json(
-      { error: 'Failed to fetch devices' },
-      { status: 500 }
+    return apiError(
+      new DatabaseError('Failed to fetch devices', error),
+      'GET /api/devices'
     );
   }
 }
 
+interface CreateDeviceBody {
+  name: string;
+  hostname: string;
+  id?: string;
+}
+
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const { name, hostname, id } = body;
+    // Parse JSON body safely
+    const { data: body, error: parseError } =
+      await safeJsonParse<CreateDeviceBody>(request);
 
-    if (!name || !hostname) {
-      return NextResponse.json(
-        { error: 'Name and hostname are required' },
-        { status: 400 }
+    if (parseError || !body) {
+      return apiError(
+        parseError ?? new Error('Request body is required'),
+        'POST /api/devices'
       );
     }
 
-    const device = createDevice(name, hostname, id);
-    return NextResponse.json({ device }, { status: 201 });
-  } catch (error) {
-    console.error('[API] Failed to create device:', error);
-    return NextResponse.json(
-      { error: 'Failed to create device' },
-      { status: 500 }
+    const { name, hostname, id } = body;
+
+    // Validate required fields
+    const validation = combineValidation(
+      validateRequired(name, 'name'),
+      validateRequired(hostname, 'hostname'),
+      validateString(name, 'name', { minLength: 1, maxLength: MAX_NAME_LENGTH }),
+      validateString(hostname, 'hostname', { minLength: 1, maxLength: MAX_HOSTNAME_LENGTH })
     );
+
+    // Optional ID validation if provided
+    if (id !== undefined) {
+      const idValidation = validateString(id, 'id', { minLength: 1, maxLength: 36 });
+      if (idValidation) {
+        validation.errors.push(idValidation);
+      }
+    }
+
+    const validationError = validationResultToError(validation);
+    if (validationError) {
+      return apiError(validationError, 'POST /api/devices');
+    }
+
+    try {
+      const device = createDevice(name, hostname, id);
+      return NextResponse.json({ device }, { status: 201 });
+    } catch (dbError) {
+      throw new DatabaseError('Failed to create device in database', dbError);
+    }
+  } catch (error) {
+    return apiError(error, 'POST /api/devices');
   }
 }
