@@ -7,7 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db, getMessage } from '@/lib/db';
 import { v4 as uuidv4 } from 'uuid';
-import type { Message, MessageRow, MessageType, MessageStatus } from '@/types';
+import type { Message, MessageRow, MessageType, MessageStatus, MessageDeliveryRow, MessageDelivery, DeviceDeliveryStatus } from '@/types';
 import {
   apiError,
   ValidationError,
@@ -26,6 +26,17 @@ import {
 const VALID_MESSAGE_TYPES = ['TEXT', 'TEXT_IMAGE', 'VIDEO', 'AUDIO'] as const;
 const MAX_CONTENT_LENGTH = 10000;
 const MAX_URL_LENGTH = 2048;
+
+// Helper: Convert MessageDeliveryRow to MessageDelivery
+function rowToDelivery(row: MessageDeliveryRow): MessageDelivery {
+  return {
+    deviceId: row.device_id,
+    status: row.status as DeviceDeliveryStatus,
+    deliveredAt: row.delivered_at ? new Date(row.delivered_at) : undefined,
+    failedAt: row.failed_at ? new Date(row.failed_at) : undefined,
+    failureReason: row.failure_reason ?? undefined,
+  };
+}
 
 // Helper: Convert MessageRow to Message
 function rowToMessage(row: MessageRow): Message {
@@ -129,6 +140,30 @@ export async function GET(request: NextRequest) {
     const stmt = db.prepare(sql);
     const rows = stmt.all(...params) as MessageRow[];
     const messages = rows.map(rowToMessage);
+
+    // Fetch deliveries for all messages in batch
+    if (messages.length > 0) {
+      const messageIds = messages.map((m) => m.id);
+      const placeholders = messageIds.map(() => '?').join(',');
+      const deliveryStmt = db.prepare(
+        `SELECT * FROM message_deliveries WHERE message_id IN (${placeholders})`
+      );
+      const deliveryRows = deliveryStmt.all(...messageIds) as MessageDeliveryRow[];
+
+      // Group deliveries by message ID
+      const deliveriesByMessage = new Map<string, MessageDelivery[]>();
+      for (const row of deliveryRows) {
+        const delivery = rowToDelivery(row);
+        const existing = deliveriesByMessage.get(row.message_id) || [];
+        existing.push(delivery);
+        deliveriesByMessage.set(row.message_id, existing);
+      }
+
+      // Attach deliveries to messages
+      for (const message of messages) {
+        message.deliveries = deliveriesByMessage.get(message.id) || [];
+      }
+    }
 
     // Get total count for pagination
     let countSql = 'SELECT COUNT(*) as count FROM messages';

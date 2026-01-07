@@ -8,7 +8,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Socket } from 'socket.io-client';
-import type { Message, MessageType } from '@/types';
+import type { Message, MessageType, DeliveryStatusUpdate, MessageDelivery } from '@/types';
 import { fetchWithRetry, postWithRetry, messageQueue } from '@/lib/fetch-with-retry';
 import { getErrorMessage } from '@/lib/errors';
 
@@ -346,6 +346,50 @@ export function useMessages(options: UseMessagesOptions = { socket: null }): Use
       }
     };
 
+    // Listen for delivery status updates
+    const handleDeliveryUpdate = (data: DeliveryStatusUpdate) => {
+      if (mountedRef.current) {
+        setMessages((prev) =>
+          prev.map((msg) => {
+            if (msg.id !== data.messageId) return msg;
+
+            // Update the delivery record for this device
+            const updatedDeliveries: MessageDelivery[] = (msg.deliveries || []).map((d) =>
+              d.deviceId === data.deviceId
+                ? { ...d, status: data.status, deliveredAt: new Date(data.timestamp) }
+                : d
+            );
+
+            // If no delivery record exists for this device, add it
+            if (!updatedDeliveries.some((d) => d.deviceId === data.deviceId)) {
+              updatedDeliveries.push({
+                deviceId: data.deviceId,
+                status: data.status,
+                deliveredAt: new Date(data.timestamp),
+              });
+            }
+
+            return {
+              ...msg,
+              status: data.overallStatus,
+              deliveries: updatedDeliveries,
+            };
+          })
+        );
+      }
+    };
+
+    // Listen for full message updates (includes all delivery data)
+    const handleMessageUpdated = (data: { message: Message }) => {
+      if (mountedRef.current && data.message) {
+        setMessages((prev) =>
+          prev.map((msg) =>
+            msg.id === data.message.id ? parseMessage(data.message) : msg
+          )
+        );
+      }
+    };
+
     // Process queue when socket reconnects
     const handleConnect = () => {
       if (messageQueue.getLength() > 0) {
@@ -354,10 +398,14 @@ export function useMessages(options: UseMessagesOptions = { socket: null }): Use
     };
 
     socket.on('message:sent', handleMessageSent);
+    socket.on('message:delivery:update', handleDeliveryUpdate);
+    socket.on('message:updated', handleMessageUpdated);
     socket.on('connect', handleConnect);
 
     return () => {
       socket.off('message:sent', handleMessageSent);
+      socket.off('message:delivery:update', handleDeliveryUpdate);
+      socket.off('message:updated', handleMessageUpdated);
       socket.off('connect', handleConnect);
     };
   }, [socket, processQueue]);

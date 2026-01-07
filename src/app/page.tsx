@@ -72,13 +72,15 @@ function RecentActivityItem({ message }: { message: Message }) {
         variant={
           message.status === 'delivered'
             ? 'success'
-            : message.status === 'sent'
+            : message.status === 'sent' || message.status === 'partial'
               ? 'info'
               : 'neutral'
         }
         size="sm"
       >
-        {message.status}
+        {message.status === 'partial' && message.deliveries
+          ? `${message.deliveries.filter(d => d.status === 'delivered').length}/${message.targetDevices.length}`
+          : message.status}
       </Badge>
     </div>
   );

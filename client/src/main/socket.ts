@@ -340,6 +340,14 @@ export function connect(): void {
     const deviceId = getDeviceId();
     if (payload.targetDevices.length === 0 || payload.targetDevices.includes(deviceId)) {
       showNotification(payload);
+
+      // Acknowledge delivery to server
+      socket!.emit('message:delivered', {
+        messageId: payload.id,
+        deviceId: deviceId,
+        timestamp: Date.now(),
+      });
+      console.log(`[Socket] Delivery acknowledged for message: ${payload.id}`);
     } else {
       console.log('[Socket] Message not targeted at this device, ignoring');
     }

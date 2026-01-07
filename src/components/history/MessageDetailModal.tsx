@@ -1,10 +1,10 @@
 'use client';
 
-import { format } from 'date-fns';
+import { format, formatDistanceToNow } from 'date-fns';
 import { clsx } from 'clsx';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
-import { MessageType, type Message, type Device } from '@/types';
+import { MessageType, type Message, type Device, type DeviceDeliveryStatus } from '@/types';
 
 interface MessageDetailModalProps {
   message: Message;
@@ -31,6 +31,15 @@ const STATUS_VARIANTS: Record<string, 'success' | 'warning' | 'info' | 'neutral'
   delivered: 'success',
   sent: 'info',
   pending: 'warning',
+  partial: 'info',
+  failed: 'neutral',
+};
+
+const DELIVERY_STATUS_ICONS: Record<DeviceDeliveryStatus, string> = {
+  delivered: '✓',
+  sent: '↗',
+  pending: '•',
+  failed: '✕',
 };
 
 export function MessageDetailModal({
@@ -45,13 +54,16 @@ export function MessageDetailModal({
     typeof message.createdAt === 'string' ? new Date(message.createdAt) : message.createdAt;
   const formattedDate = format(createdAt, 'PPpp');
 
-  // Get device details for target devices
+  // Get device details for target devices with delivery status
   const targetDeviceDetails = message.targetDevices.map((deviceId) => {
     const device = devices.find((d) => d.id === deviceId);
+    const delivery = message.deliveries?.find((d) => d.deviceId === deviceId);
     return {
       id: deviceId,
       name: device?.name || 'Unknown Device',
-      status: device?.status || 'offline',
+      connectionStatus: device?.status || 'offline',
+      deliveryStatus: delivery?.status || 'pending',
+      deliveredAt: delivery?.deliveredAt,
     };
   });
 
@@ -197,7 +209,7 @@ export function MessageDetailModal({
             </div>
           )}
 
-          {/* Target Devices */}
+          {/* Target Devices with Delivery Status */}
           <div>
             <span className="text-xs text-slate-500 uppercase tracking-wide block mb-2">
               Target Devices ({targetDeviceDetails.length})
@@ -208,19 +220,55 @@ export function MessageDetailModal({
                   key={device.id}
                   className="flex items-center gap-3 bg-slate-900 rounded-lg p-3 border border-slate-700"
                 >
+                  {/* Connection status indicator */}
                   <span
                     className={clsx(
                       'w-2 h-2 rounded-full flex-shrink-0',
-                      device.status === 'online' ? 'bg-green-500' : 'bg-slate-500'
+                      device.connectionStatus === 'online' ? 'bg-green-500' : 'bg-slate-500'
                     )}
+                    title={device.connectionStatus === 'online' ? 'Online' : 'Offline'}
                   />
-                  <span className="text-white text-sm">{device.name}</span>
-                  <span className="text-xs text-slate-500 ml-auto font-mono">
-                    {device.id.slice(0, 8)}...
-                  </span>
+                  <div className="flex-1 min-w-0">
+                    <span className="text-white text-sm block truncate">{device.name}</span>
+                    <span className="text-xs text-slate-500 font-mono">
+                      {device.id.slice(0, 8)}...
+                    </span>
+                  </div>
+                  {/* Delivery status */}
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={clsx(
+                        'inline-flex items-center justify-center w-5 h-5 rounded-full text-xs font-medium',
+                        device.deliveryStatus === 'delivered' && 'bg-green-500/20 text-green-400',
+                        device.deliveryStatus === 'sent' && 'bg-blue-500/20 text-blue-400',
+                        device.deliveryStatus === 'pending' && 'bg-yellow-500/20 text-yellow-400',
+                        device.deliveryStatus === 'failed' && 'bg-red-500/20 text-red-400'
+                      )}
+                      title={`Delivery: ${device.deliveryStatus}`}
+                    >
+                      {DELIVERY_STATUS_ICONS[device.deliveryStatus]}
+                    </span>
+                    {device.deliveredAt && (
+                      <span className="text-xs text-slate-500">
+                        {formatDistanceToNow(
+                          typeof device.deliveredAt === 'string'
+                            ? new Date(device.deliveredAt)
+                            : device.deliveredAt,
+                          { addSuffix: true }
+                        )}
+                      </span>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
+            {/* Delivery summary */}
+            {message.deliveries && message.deliveries.length > 0 && (
+              <div className="mt-3 text-xs text-slate-500">
+                {message.deliveries.filter(d => d.status === 'delivered').length} of{' '}
+                {targetDeviceDetails.length} delivered
+              </div>
+            )}
           </div>
 
           {/* Message ID */}

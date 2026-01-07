@@ -40,12 +40,29 @@ This final phase adds polish, improves reliability, and prepares CreaBomber for 
   - Enhanced Compose page with success animation after message send and sound feedback
   - Button component already had loading state with spinner (existing)
 
-- [ ] Implement message delivery tracking:
+- [x] Implement message delivery tracking:
   - Add 'delivered' status when client acknowledges receipt
   - Client emits 'message:delivered' with message ID and timestamp
   - Dashboard updates message status in real-time
   - History shows delivery status per target device
   - Failed delivery indication if device was offline
+
+  **Implementation Notes (completed 2025-01-07):**
+  - Added `MessageDelivery` type and `message_deliveries` database table for per-device delivery tracking
+  - Extended `Message` type with optional `deliveries` array and added `partial` status for partial delivery
+  - Updated socket server (`socket-server.ts`) to:
+    - Create delivery records when sending messages via `createMessageDeliveries()`
+    - Handle `message:delivered` events from clients via `handleMessageDelivered()`
+    - Broadcast `message:delivery:update` and `message:updated` events to dashboard
+    - Recalculate overall message status (pending/sent/partial/delivered)
+  - Updated Electron client (`socket.ts`) to emit `message:delivered` acknowledgment when showing notifications
+  - Enhanced `useMessages` hook to listen for delivery status updates and update UI in real-time
+  - Updated API routes (`/api/messages`) to return delivery data with messages
+  - Enhanced `MessageDetailModal` to show per-device delivery status with:
+    - Delivery status icons (✓ delivered, ↗ sent, • pending, ✕ failed)
+    - Time since delivery for delivered messages
+    - Delivery summary (X of Y delivered)
+  - Updated `MessageHistoryItem` and dashboard to show partial status as "X/Y" format
 
 - [ ] Add keyboard shortcuts for power users:
   - Dashboard: Cmd+N to compose new message

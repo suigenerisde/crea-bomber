@@ -11,12 +11,18 @@ import {
   upsertDevice,
   createMessage,
   updateMessageStatus,
+  createMessageDeliveries,
+  updateDeliveryStatus,
+  recalculateMessageStatus,
+  getMessageWithDeliveries,
 } from './db';
 import type {
   DeviceRegistration,
   MessagePayload,
   Device,
   MessageType,
+  DeliveryAckPayload,
+  DeliveryStatusUpdate,
 } from '@/types';
 
 // Store socket-to-device mapping
@@ -57,6 +63,11 @@ export function initSocketServer(httpServer: HttpServer): Server {
     // Handle message sending
     socket.on('message:send', (payload: MessagePayload) => {
       handleMessageSend(socket, payload);
+    });
+
+    // Handle message delivery acknowledgment from client
+    socket.on('message:delivered', (payload: DeliveryAckPayload) => {
+      handleMessageDelivered(socket, payload);
     });
 
     // Handle disconnection
@@ -125,6 +136,7 @@ function handleDeviceHeartbeat(socket: Socket): void {
 /**
  * Handle message sending
  * - Save message to database
+ * - Create delivery records for each target device
  * - Broadcast to target device rooms
  * - Update message status
  */
@@ -140,6 +152,9 @@ function handleMessageSend(socket: Socket, payload: MessagePayload): void {
     audioUrl,
     audioAutoplay,
   });
+
+  // Create delivery records for each target device
+  createMessageDeliveries(message.id, targetDevices, 'sent');
 
   // Emit to each target device room
   for (const deviceId of targetDevices) {
@@ -157,6 +172,52 @@ function handleMessageSend(socket: Socket, payload: MessagePayload): void {
 
   // Notify sender of successful send
   socket.emit('message:sent', { messageId: message.id });
+}
+
+/**
+ * Handle message delivery acknowledgment from client
+ * - Update delivery status for the specific device
+ * - Recalculate overall message status
+ * - Broadcast delivery status update to dashboard
+ */
+function handleMessageDelivered(socket: Socket, payload: DeliveryAckPayload): void {
+  const { messageId, deviceId, timestamp } = payload;
+
+  console.log(`[Socket] Delivery acknowledged: ${messageId} by device ${deviceId}`);
+
+  // Update delivery status in database
+  const updated = updateDeliveryStatus(messageId, deviceId, 'delivered', timestamp);
+
+  if (!updated) {
+    console.warn(`[Socket] Failed to update delivery status for message ${messageId}, device ${deviceId}`);
+    return;
+  }
+
+  // Recalculate and update overall message status
+  const overallStatus = recalculateMessageStatus(messageId);
+
+  // Get updated message with deliveries
+  const message = getMessageWithDeliveries(messageId);
+
+  // Broadcast delivery status update to all dashboard clients
+  if (io) {
+    const statusUpdate: DeliveryStatusUpdate = {
+      messageId,
+      deviceId,
+      status: 'delivered',
+      timestamp,
+      overallStatus,
+    };
+
+    io.emit('message:delivery:update', statusUpdate);
+
+    // Also broadcast the full updated message for dashboard to update its state
+    if (message) {
+      io.emit('message:updated', { message });
+    }
+  }
+
+  console.log(`[Socket] Message ${messageId} overall status: ${overallStatus}`);
 }
 
 /**

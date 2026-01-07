@@ -28,7 +28,19 @@ const STATUS_VARIANTS: Record<string, 'success' | 'warning' | 'info' | 'neutral'
   delivered: 'success',
   sent: 'info',
   pending: 'warning',
+  partial: 'info',
+  failed: 'neutral',
 };
+
+// Get status label with delivery count for partial status
+function getStatusLabel(message: Message): string {
+  if (message.status === 'partial' && message.deliveries) {
+    const delivered = message.deliveries.filter(d => d.status === 'delivered').length;
+    const total = message.targetDevices.length;
+    return `${delivered}/${total}`;
+  }
+  return message.status;
+}
 
 export function MessageHistoryItem({ message, onClick }: MessageHistoryItemProps) {
   const createdAt =
@@ -65,7 +77,7 @@ export function MessageHistoryItem({ message, onClick }: MessageHistoryItemProps
               variant={STATUS_VARIANTS[message.status] || 'neutral'}
               size="sm"
             >
-              {message.status}
+              {getStatusLabel(message)}
             </Badge>
           </div>
 

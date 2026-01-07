@@ -10,8 +10,11 @@ import type {
   Device,
   DeviceRow,
   DeviceStatus,
+  DeviceDeliveryStatus,
   Message,
   MessageRow,
+  MessageDelivery,
+  MessageDeliveryRow,
   MessageStatus,
   MessageType,
 } from '@/types';
@@ -48,6 +51,22 @@ db.exec(`
     status TEXT DEFAULT 'pending',
     created_at INTEGER NOT NULL
   );
+
+  CREATE TABLE IF NOT EXISTS message_deliveries (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    message_id TEXT NOT NULL,
+    device_id TEXT NOT NULL,
+    status TEXT DEFAULT 'pending',
+    delivered_at INTEGER,
+    failed_at INTEGER,
+    failure_reason TEXT,
+    FOREIGN KEY (message_id) REFERENCES messages(id) ON DELETE CASCADE,
+    FOREIGN KEY (device_id) REFERENCES devices(id) ON DELETE CASCADE,
+    UNIQUE(message_id, device_id)
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_deliveries_message ON message_deliveries(message_id);
+  CREATE INDEX IF NOT EXISTS idx_deliveries_device ON message_deliveries(device_id);
 `);
 
 // Helper: Convert DeviceRow to Device
@@ -75,6 +94,17 @@ function rowToMessage(row: MessageRow): Message {
     targetDevices: JSON.parse(row.target_devices),
     status: row.status as MessageStatus,
     createdAt: new Date(row.created_at),
+  };
+}
+
+// Helper: Convert MessageDeliveryRow to MessageDelivery
+function rowToDelivery(row: MessageDeliveryRow): MessageDelivery {
+  return {
+    deviceId: row.device_id,
+    status: row.status as DeviceDeliveryStatus,
+    deliveredAt: row.delivered_at ? new Date(row.delivered_at) : undefined,
+    failedAt: row.failed_at ? new Date(row.failed_at) : undefined,
+    failureReason: row.failure_reason ?? undefined,
   };
 }
 
@@ -235,6 +265,139 @@ export function updateMessageStatus(
   const stmt = db.prepare('UPDATE messages SET status = ? WHERE id = ?');
   const result = stmt.run(status, id);
   return result.changes > 0;
+}
+
+// Message delivery operations
+
+/**
+ * Create delivery records for a message when it's sent to devices
+ */
+export function createMessageDeliveries(
+  messageId: string,
+  deviceIds: string[],
+  initialStatus: DeviceDeliveryStatus = 'sent'
+): void {
+  const stmt = db.prepare(`
+    INSERT OR REPLACE INTO message_deliveries (message_id, device_id, status)
+    VALUES (?, ?, ?)
+  `);
+
+  const insertMany = db.transaction((ids: string[]) => {
+    for (const deviceId of ids) {
+      stmt.run(messageId, deviceId, initialStatus);
+    }
+  });
+
+  insertMany(deviceIds);
+}
+
+/**
+ * Update delivery status for a specific device
+ */
+export function updateDeliveryStatus(
+  messageId: string,
+  deviceId: string,
+  status: DeviceDeliveryStatus,
+  timestamp?: number
+): boolean {
+  const now = timestamp || Date.now();
+  let sql = 'UPDATE message_deliveries SET status = ?';
+  const params: (string | number)[] = [status];
+
+  if (status === 'delivered') {
+    sql += ', delivered_at = ?';
+    params.push(now);
+  } else if (status === 'failed') {
+    sql += ', failed_at = ?';
+    params.push(now);
+  }
+
+  sql += ' WHERE message_id = ? AND device_id = ?';
+  params.push(messageId, deviceId);
+
+  const stmt = db.prepare(sql);
+  const result = stmt.run(...params);
+  return result.changes > 0;
+}
+
+/**
+ * Get delivery records for a message
+ */
+export function getMessageDeliveries(messageId: string): MessageDelivery[] {
+  const stmt = db.prepare('SELECT * FROM message_deliveries WHERE message_id = ?');
+  const rows = stmt.all(messageId) as MessageDeliveryRow[];
+  return rows.map(rowToDelivery);
+}
+
+/**
+ * Get a message with its delivery records
+ */
+export function getMessageWithDeliveries(id: string): Message | null {
+  const message = getMessage(id);
+  if (!message) return null;
+
+  message.deliveries = getMessageDeliveries(id);
+  return message;
+}
+
+/**
+ * Get messages with their delivery records
+ */
+export function getMessagesWithDeliveries(limit = 100): Message[] {
+  const messages = getMessages(limit);
+
+  // Batch fetch all deliveries for these messages
+  const messageIds = messages.map(m => m.id);
+  if (messageIds.length === 0) return messages;
+
+  const placeholders = messageIds.map(() => '?').join(',');
+  const stmt = db.prepare(`SELECT * FROM message_deliveries WHERE message_id IN (${placeholders})`);
+  const rows = stmt.all(...messageIds) as MessageDeliveryRow[];
+
+  // Group deliveries by message ID
+  const deliveriesByMessage = new Map<string, MessageDelivery[]>();
+  for (const row of rows) {
+    const delivery = rowToDelivery(row);
+    const existing = deliveriesByMessage.get(row.message_id) || [];
+    existing.push(delivery);
+    deliveriesByMessage.set(row.message_id, existing);
+  }
+
+  // Attach deliveries to messages
+  for (const message of messages) {
+    message.deliveries = deliveriesByMessage.get(message.id) || [];
+  }
+
+  return messages;
+}
+
+/**
+ * Calculate and update overall message status based on delivery statuses
+ */
+export function recalculateMessageStatus(messageId: string): MessageStatus {
+  const deliveries = getMessageDeliveries(messageId);
+
+  if (deliveries.length === 0) {
+    return 'pending';
+  }
+
+  const allDelivered = deliveries.every(d => d.status === 'delivered');
+  const allFailed = deliveries.every(d => d.status === 'failed');
+  const someDelivered = deliveries.some(d => d.status === 'delivered');
+
+  let newStatus: MessageStatus;
+  if (allDelivered) {
+    newStatus = 'delivered';
+  } else if (allFailed) {
+    newStatus = 'sent'; // Keep as sent if all failed (not worse than sent)
+  } else if (someDelivered) {
+    newStatus = 'partial';
+  } else {
+    newStatus = 'sent';
+  }
+
+  updateMessageStatus(messageId, newStatus);
+  return newStatus;
 }
 
 // Utility functions

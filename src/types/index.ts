@@ -14,8 +14,20 @@ export enum MessageType {
 // Device status
 export type DeviceStatus = 'online' | 'offline';
 
-// Message delivery status
-export type MessageStatus = 'pending' | 'sent' | 'delivered';
+// Message delivery status (overall status)
+export type MessageStatus = 'pending' | 'sent' | 'delivered' | 'partial';
+
+// Per-device delivery status
+export type DeviceDeliveryStatus = 'pending' | 'sent' | 'delivered' | 'failed';
+
+// Per-device delivery tracking
+export interface MessageDelivery {
+  deviceId: string;
+  status: DeviceDeliveryStatus;
+  deliveredAt?: Date;
+  failedAt?: Date;
+  failureReason?: string;
+}
 
 // Device representation
 export interface Device {
@@ -38,6 +50,7 @@ export interface Message {
   audioAutoplay?: boolean;
   targetDevices: string[];
   status: MessageStatus;
+  deliveries?: MessageDelivery[];
   createdAt: Date;
 }
 
@@ -82,4 +95,31 @@ export interface MessageRow {
   target_devices: string;
   status: string;
   created_at: number;
+}
+
+// Database row type for message deliveries
+export interface MessageDeliveryRow {
+  id: number;
+  message_id: string;
+  device_id: string;
+  status: string;
+  delivered_at: number | null;
+  failed_at: number | null;
+  failure_reason: string | null;
+}
+
+// Socket event payload for delivery acknowledgment
+export interface DeliveryAckPayload {
+  messageId: string;
+  deviceId: string;
+  timestamp: number;
+}
+
+// Socket event payload for delivery status update
+export interface DeliveryStatusUpdate {
+  messageId: string;
+  deviceId: string;
+  status: DeviceDeliveryStatus;
+  timestamp: number;
+  overallStatus: MessageStatus;
 }
