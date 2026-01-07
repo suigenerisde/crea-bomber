@@ -29,11 +29,12 @@ This phase creates the reusable UI component library and application layout stru
   - MainLayout.tsx: combines Sidebar + Header + main content area with proper spacing, responsive container
   ✅ Created all 3 layout components with barrel export in index.ts. Sidebar has navigation with active state highlighting, Header shows connection status (connected/disconnected/connecting), MainLayout combines both with proper 64px sidebar offset
 
-- [ ] Update src/app/layout.tsx to use MainLayout:
+- [x] Update src/app/layout.tsx to use MainLayout:
   - Import and wrap children with MainLayout component
   - Set up metadata: title "CreaBomber", description "Internal Push Notification System"
   - Import globals.css
   - Set html/body dark theme classes (bg-slate-900, text-white)
+  ✅ Updated layout.tsx: imported MainLayout from @/components/layout, wrapped children, set metadata title/description, added dark class to html element and bg-slate-900/text-white to body
 
 - [ ] Create placeholder pages to verify layout works:
   - src/app/page.tsx: Dashboard placeholder with "Dashboard" heading
