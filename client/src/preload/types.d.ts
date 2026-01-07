@@ -81,6 +81,26 @@ interface CreaBomberAPI {
    * @returns Promise resolving to server URL string
    */
   getServerUrl: () => Promise<string>;
+
+  // === Settings Window API ===
+
+  /**
+   * Get all settings (for settings window)
+   * @returns Promise resolving to settings object with serverUrl and connectionStatus
+   */
+  getSettings: () => Promise<{ serverUrl: string; connectionStatus: ConnectionStatus }>;
+
+  /**
+   * Save settings (for settings window)
+   * @param settings Object containing settings to save
+   * @returns Promise resolving to success indicator
+   */
+  saveSettings: (settings: { serverUrl: string }) => Promise<{ success: boolean }>;
+
+  /**
+   * Close settings window
+   */
+  closeSettings: () => void;
 }
 
 // Extend the Window interface to include the creaBomber API

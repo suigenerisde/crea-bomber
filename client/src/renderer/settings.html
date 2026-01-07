@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'">
+  <title>CreaBomber Settings</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+      background: #1e293b;
+      color: #f1f5f9;
+      padding: 24px;
+      min-height: 100vh;
+    }
+
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+
+    .header svg {
+      width: 32px;
+      height: 32px;
+    }
+
+    .header h1 {
+      font-size: 20px;
+      font-weight: 600;
+    }
+
+    .form-group {
+      margin-bottom: 20px;
+    }
+
+    label {
+      display: block;
+      font-size: 13px;
+      font-weight: 500;
+      color: #94a3b8;
+      margin-bottom: 8px;
+    }
+
+    input[type="text"],
+    input[type="url"] {
+      width: 100%;
+      padding: 10px 12px;
+      font-size: 14px;
+      background: #334155;
+      border: 1px solid #475569;
+      border-radius: 6px;
+      color: #f1f5f9;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    input[type="text"]:focus,
+    input[type="url"]:focus {
+      outline: none;
+      border-color: #3b82f6;
+      box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+    }
+
+    input[type="text"]::placeholder,
+    input[type="url"]::placeholder {
+      color: #64748b;
+    }
+
+    .status-indicator {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px;
+      background: #334155;
+      border-radius: 6px;
+      margin-bottom: 20px;
+    }
+
+    .status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+    }
+
+    .status-dot.connected {
+      background: #22c55e;
+      box-shadow: 0 0 6px #22c55e;
+    }
+
+    .status-dot.connecting {
+      background: #f59e0b;
+      animation: pulse 1.5s infinite;
+    }
+
+    .status-dot.disconnected {
+      background: #6b7280;
+    }
+
+    .status-dot.error {
+      background: #ef4444;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    .status-text {
+      font-size: 13px;
+      color: #94a3b8;
+    }
+
+    .button-group {
+      display: flex;
+      gap: 12px;
+      margin-top: 24px;
+    }
+
+    button {
+      flex: 1;
+      padding: 10px 16px;
+      font-size: 14px;
+      font-weight: 500;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    button.primary {
+      background: #3b82f6;
+      border: none;
+      color: white;
+    }
+
+    button.primary:hover {
+      background: #2563eb;
+    }
+
+    button.primary:active {
+      background: #1d4ed8;
+    }
+
+    button.secondary {
+      background: transparent;
+      border: 1px solid #475569;
+      color: #94a3b8;
+    }
+
+    button.secondary:hover {
+      background: #334155;
+      color: #f1f5f9;
+    }
+
+    .help-text {
+      font-size: 12px;
+      color: #64748b;
+      margin-top: 6px;
+    }
+
+    .version {
+      position: absolute;
+      bottom: 16px;
+      right: 24px;
+      font-size: 11px;
+      color: #475569;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="16" cy="16" r="14" fill="#3b82f6"/>
+      <path d="M10 16L14 20L22 12" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    <h1>Settings</h1>
+  </div>
+
+  <div class="status-indicator">
+    <div class="status-dot" id="statusDot"></div>
+    <span class="status-text" id="statusText">Checking connection...</span>
+  </div>
+
+  <form id="settingsForm">
+    <div class="form-group">
+      <label for="serverUrl">Dashboard Server URL</label>
+      <input type="url" id="serverUrl" name="serverUrl" placeholder="http://localhost:3000" required>
+      <p class="help-text">The URL of the CreaBomber dashboard server</p>
+    </div>
+
+    <div class="button-group">
+      <button type="button" class="secondary" id="cancelBtn">Cancel</button>
+      <button type="submit" class="primary" id="saveBtn">Save & Reconnect</button>
+    </div>
+  </form>
+
+  <div class="version" id="version">v1.0.0</div>
+
+  <script src="settings.js"></script>
+</body>
+</html>

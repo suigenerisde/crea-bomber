@@ -126,6 +126,29 @@ const creaBomberAPI = {
   getServerUrl: async (): Promise<string> => {
     return ipcRenderer.invoke('connection:getServerUrl');
   },
+
+  // === Settings Window API ===
+
+  /**
+   * Get all settings (for settings window)
+   */
+  getSettings: async (): Promise<{ serverUrl: string; connectionStatus: ConnectionStatus }> => {
+    return ipcRenderer.invoke('settings:get');
+  },
+
+  /**
+   * Save settings (for settings window)
+   */
+  saveSettings: async (settings: { serverUrl: string }): Promise<{ success: boolean }> => {
+    return ipcRenderer.invoke('settings:save', settings);
+  },
+
+  /**
+   * Close settings window
+   */
+  closeSettings: (): void => {
+    ipcRenderer.send('settings:close');
+  },
 };
 
 // Expose the API to the renderer window

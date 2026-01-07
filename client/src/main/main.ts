@@ -6,6 +6,7 @@
 import { app, BrowserWindow, screen, ipcMain } from 'electron';
 import * as path from 'path';
 import { connect, getDeviceInfo, getConnectionStatus, getServerUrl } from './socket';
+import { initializeTray, destroyTray } from './tray';
 
 // Notification window configuration
 const NOTIFICATION_WIDTH = 400;
@@ -270,6 +271,9 @@ async function initialize(): Promise<void> {
   // Create notification window
   notificationWindow = createNotificationWindow();
 
+  // Initialize system tray
+  initializeTray();
+
   // Connect to dashboard WebSocket server
   connect();
 
@@ -302,6 +306,8 @@ app.on('will-quit', () => {
   if (currentNotificationTimeout) {
     clearTimeout(currentNotificationTimeout);
   }
+  // Clean up system tray
+  destroyTray();
 });
 
 // Export for use by socket.ts

@@ -67,12 +67,22 @@ This phase creates the macOS client application that runs on target devices. The
   > - Reset: Comprehensive resetContent() cleans up innerHTML, event handlers, inline styles for all media types
   > TypeScript builds successfully.
 
-- [ ] Create system tray integration in client/src/main/tray.ts:
+- [x] Create system tray integration in client/src/main/tray.ts:
   - Create tray icon (custom CreaBomber icon or status indicator)
   - Tray menu items: "Connected to [server]" (status), "Reconnect", "Settings...", "Quit"
   - Show connection status via icon color or badge (green = connected, red = disconnected)
   - Click on tray icon shows recent notifications or settings
   - Settings window: server URL configuration, notification duration, sound on/off
+  > Completed: Created comprehensive tray.ts with:
+  > - SVG-based status icon (green=connected, amber=connecting, gray=disconnected, red=error)
+  > - Context menu with: status display, Reconnect, Settings..., Open Dashboard, Quit
+  > - Settings window (settings.html + settings.js) with server URL configuration
+  > - Real-time status updates via onStatusChange subscription
+  > - IPC handlers for settings:get, settings:save, settings:close
+  > - Updated preload.ts with getSettings(), saveSettings(), closeSettings() methods
+  > - Updated types.d.ts with new API definitions
+  > - Integrated tray initialization/cleanup in main.ts
+  > TypeScript builds successfully.
 
 - [ ] Create macOS app configuration and icons:
   - Design or generate app icon (1024x1024 for macOS)
