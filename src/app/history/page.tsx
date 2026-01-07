@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { clsx } from 'clsx';
 import { Search } from 'lucide-react';
 import { useSocket, useDevices, useMessages } from '@/hooks';
@@ -8,6 +8,7 @@ import { MessageHistoryList, MessageDetailModal } from '@/components/history';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
+import { useToast } from '@/contexts';
 import { MessageType, type Message } from '@/types';
 
 const MESSAGE_TYPE_OPTIONS = [
@@ -19,8 +20,18 @@ const MESSAGE_TYPE_OPTIONS = [
 ];
 
 export default function HistoryPage() {
-  const { socket, status: socketStatus } = useSocket();
+  const toast = useToast();
+  const { socket, status: socketStatus, isConnected } = useSocket();
   const { devices } = useDevices({ socket });
+  const wasConnectedRef = useRef(true);
+
+  // Show warning toast when connection is lost
+  useEffect(() => {
+    if (wasConnectedRef.current && !isConnected && socketStatus === 'disconnected') {
+      toast.warning('Connection lost. Real-time updates paused.');
+    }
+    wasConnectedRef.current = isConnected;
+  }, [isConnected, socketStatus, toast]);
 
   // Filter state
   const [typeFilter, setTypeFilter] = useState<MessageType | ''>('');

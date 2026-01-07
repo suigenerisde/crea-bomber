@@ -1,11 +1,13 @@
 'use client';
 
+import { useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { formatDistanceToNow } from 'date-fns';
 import { useSocket, useDevices, useMessages } from '@/hooks';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
+import { useToast } from '@/contexts';
 import { MessageType, type Device, type Message } from '@/types';
 
 // Message type icon mapping
@@ -101,9 +103,19 @@ function DeviceStatusItem({ device }: { device: Device }) {
 }
 
 export default function DashboardPage() {
-  const { socket, status: socketStatus } = useSocket();
+  const toast = useToast();
+  const { socket, status: socketStatus, isConnected } = useSocket();
   const { devices, onlineCount, offlineCount, loading: devicesLoading } = useDevices({ socket });
   const { messages, loading: messagesLoading } = useMessages({ socket, initialLimit: 5 });
+  const wasConnectedRef = useRef(true);
+
+  // Show warning toast when connection is lost
+  useEffect(() => {
+    if (wasConnectedRef.current && !isConnected && socketStatus === 'disconnected') {
+      toast.warning('Connection lost. Real-time updates paused.');
+    }
+    wasConnectedRef.current = isConnected;
+  }, [isConnected, socketStatus, toast]);
 
   // Calculate stats
   const totalDevices = devices.length;

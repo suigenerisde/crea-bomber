@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { clsx } from 'clsx';
 import { useSocket, useDevices } from '@/hooks';
 import { DeviceList, DeviceDetailModal } from '@/components/devices';
 import { Button } from '@/components/ui/Button';
+import { useToast } from '@/contexts';
 import type { Device } from '@/types';
 
 type FilterTab = 'all' | 'online' | 'offline';
@@ -16,7 +17,8 @@ const FILTER_TABS: { value: FilterTab; label: string }[] = [
 ];
 
 export default function DevicesPage() {
-  const { socket, status: socketStatus } = useSocket();
+  const toast = useToast();
+  const { socket, status: socketStatus, isConnected } = useSocket();
   const { devices, loading, error, refresh, onlineCount, offlineCount } = useDevices({
     socket,
   });
@@ -24,7 +26,15 @@ export default function DevicesPage() {
   const [activeFilter, setActiveFilter] = useState<FilterTab>('all');
   const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [removeError, setRemoveError] = useState<string | null>(null);
+  const wasConnectedRef = useRef(true);
+
+  // Show warning toast when connection is lost
+  useEffect(() => {
+    if (wasConnectedRef.current && !isConnected && socketStatus === 'disconnected') {
+      toast.warning('Connection lost. Real-time updates paused.');
+    }
+    wasConnectedRef.current = isConnected;
+  }, [isConnected, socketStatus, toast]);
 
   // Handle manual refresh
   const handleRefresh = useCallback(async () => {
@@ -39,7 +49,6 @@ export default function DevicesPage() {
   // Handle device removal
   const handleRemoveDevice = useCallback(
     async (deviceId: string) => {
-      setRemoveError(null);
       try {
         const response = await fetch(`/api/devices/${deviceId}`, {
           method: 'DELETE',
@@ -50,15 +59,16 @@ export default function DevicesPage() {
           throw new Error(data.error || 'Failed to remove device');
         }
 
+        toast.success('Device removed successfully');
         // Refresh the device list
         await refresh();
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Failed to remove device';
-        setRemoveError(message);
+        toast.error(message);
         throw err;
       }
     },
-    [refresh]
+    [refresh, toast]
   );
 
   // Get count for each filter tab
@@ -167,19 +177,6 @@ export default function DevicesPage() {
           >
             Try Again
           </Button>
-        </div>
-      )}
-
-      {/* Remove Error */}
-      {removeError && (
-        <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4">
-          <p className="text-red-400 text-sm">{removeError}</p>
-          <button
-            onClick={() => setRemoveError(null)}
-            className="text-red-400 text-sm underline mt-1"
-          >
-            Dismiss
-          </button>
         </div>
       )}
 

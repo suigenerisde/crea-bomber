@@ -7,15 +7,16 @@ import { PreviewModal } from '@/components/preview';
 import { DeviceSelector } from '@/components/devices';
 import { Card, Badge } from '@/components/ui';
 import { useSocket, useDevices, useMessages } from '@/hooks';
+import { useToast } from '@/contexts';
 
 export default function ComposePage() {
   const router = useRouter();
   const composerRef = useRef<MessageComposerRef>(null);
+  const toast = useToast();
   const [selectedDevices, setSelectedDevices] = useState<string[]>([]);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewMessage, setPreviewMessage] = useState<MessageData | null>(null);
   const [isSending, setIsSending] = useState(false);
-  const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   // Use real hooks for data management
   const { socket, status: socketStatus, isConnected } = useSocket();
@@ -24,8 +25,7 @@ export default function ComposePage() {
 
   const handlePreview = (data: MessageData) => {
     if (selectedDevices.length === 0) {
-      setToast({ type: 'error', message: 'Please select at least one device' });
-      setTimeout(() => setToast(null), 3000);
+      toast.error('Please select at least one device');
       return;
     }
     setPreviewMessage(data);
@@ -34,8 +34,7 @@ export default function ComposePage() {
 
   const handleSend = async (data: MessageData) => {
     if (selectedDevices.length === 0) {
-      setToast({ type: 'error', message: 'Please select at least one device' });
-      setTimeout(() => setToast(null), 3000);
+      toast.error('Please select at least one device');
       return;
     }
 
@@ -52,7 +51,7 @@ export default function ComposePage() {
         audioAutoplay: data.audioAutoplay,
       });
 
-      setToast({ type: 'success', message: 'Message sent successfully!' });
+      toast.success('Message sent successfully!');
 
       // Redirect to history after short delay
       setTimeout(() => {
@@ -60,8 +59,7 @@ export default function ComposePage() {
       }, 1500);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to send message';
-      setToast({ type: 'error', message });
-      setTimeout(() => setToast(null), 5000);
+      toast.error(message);
     } finally {
       setIsSending(false);
     }
@@ -83,19 +81,6 @@ export default function ComposePage() {
 
   return (
     <div className="space-y-6">
-      {/* Toast notification */}
-      {toast && (
-        <div
-          className={`fixed top-4 right-4 z-50 px-4 py-3 rounded-lg shadow-lg animate-fade-in ${
-            toast.type === 'success'
-              ? 'bg-green-500/90 text-white'
-              : 'bg-red-500/90 text-white'
-          }`}
-        >
-          {toast.message}
-        </div>
-      )}
-
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
