@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' https: data:; media-src 'self' https: data:; frame-src https://www.youtube.com https://www.loom.com https://player.vimeo.com;">
+  <title>CreaBomber Notification</title>
+  <link rel="stylesheet" href="notification.css">
+</head>
+<body>
+  <div id="notification" class="notification hidden">
+    <!-- Header -->
+    <div class="notification-header">
+      <div class="notification-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+        </svg>
+      </div>
+      <div class="notification-title">
+        <p class="notification-app">CreaBomber</p>
+        <p class="notification-subtitle">Notification</p>
+      </div>
+      <span id="timestamp" class="notification-time"></span>
+      <button id="close-btn" class="notification-close" aria-label="Close">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="18" y1="6" x2="6" y2="18"></line>
+          <line x1="6" y1="6" x2="18" y2="18"></line>
+        </svg>
+      </button>
+    </div>
+
+    <!-- Content -->
+    <div class="notification-content">
+      <!-- Text Content -->
+      <p id="text-content" class="notification-text"></p>
+
+      <!-- Image Container -->
+      <div id="image-container" class="notification-image-container hidden">
+        <div id="image-loading" class="loading-indicator">
+          <div class="loading-spinner"></div>
+        </div>
+        <img id="image-content" class="notification-image" alt="Notification image">
+      </div>
+
+      <!-- Video Container -->
+      <div id="video-container" class="notification-video-container hidden">
+        <div id="video-thumbnail" class="video-thumbnail">
+          <img id="video-thumb-img" class="video-thumb-img" alt="Video thumbnail">
+          <div class="video-play-overlay">
+            <div class="video-play-button">
+              <svg viewBox="0 0 24 24" fill="currentColor">
+                <polygon points="5 3 19 12 5 21 5 3"></polygon>
+              </svg>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Audio Container -->
+      <div id="audio-container" class="notification-audio-container hidden">
+        <div class="audio-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+            <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+            <path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>
+          </svg>
+        </div>
+        <div class="audio-waveform" id="audio-waveform"></div>
+        <div class="audio-info">
+          <span class="audio-label">Audio message</span>
+          <span id="audio-autoplay-badge" class="audio-autoplay-badge hidden">Auto-play</span>
+        </div>
+        <audio id="audio-player" class="hidden"></audio>
+      </div>
+    </div>
+
+    <!-- Progress Bar -->
+    <div class="notification-progress">
+      <div id="progress-bar" class="notification-progress-bar"></div>
+    </div>
+  </div>
+
+  <script src="notification.js"></script>
+</body>
+</html>
