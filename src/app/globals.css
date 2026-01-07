@@ -1,26 +1,339 @@
 @import "tailwindcss";
 
+/* =============================================================================
+   Dark Theme Color Scheme
+   - Background: slate-900 (#0f172a)
+   - Cards: slate-800 (#1e293b)
+   - Borders: slate-700 (#334155)
+   - Muted text: slate-400 (#94a3b8)
+   - Primary text: white (#ffffff)
+
+   Accent Colors:
+   - Primary actions: blue-500 (#3b82f6)
+   - Success/Online: green-500 (#22c55e)
+   - Danger/Error: red-500 (#ef4444)
+   - Warning: yellow-500 (#eab308)
+   ============================================================================= */
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #0f172a;
+  --foreground: #ffffff;
+  --card: #1e293b;
+  --card-hover: #283548;
+  --border: #334155;
+  --border-hover: #475569;
+  --muted: #94a3b8;
+  --primary: #3b82f6;
+  --primary-hover: #2563eb;
+  --success: #22c55e;
+  --danger: #ef4444;
+  --warning: #eab308;
+  --info: #3b82f6;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-slate-750: #283548;
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* =============================================================================
+   Base Styles
+   ============================================================================= */
+
+html {
+  color-scheme: dark;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+  min-height: 100vh;
+}
+
+/* =============================================================================
+   Custom Scrollbar Styling for Dark Theme
+   ============================================================================= */
+
+/* Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #475569 #1e293b;
+}
+
+/* Chrome, Edge, Safari */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #1e293b;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #475569;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #64748b;
+}
+
+::-webkit-scrollbar-corner {
+  background: #1e293b;
+}
+
+/* =============================================================================
+   Animation Keyframes - Notification Animations
+   ============================================================================= */
+
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideOutRight {
+  from {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes fadeOut {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    transform: scale(0.95);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* Animation utility classes */
+.animate-slide-in-right {
+  animation: slideInRight 0.3s ease-out forwards;
+}
+
+.animate-slide-out-right {
+  animation: slideOutRight 0.3s ease-in forwards;
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.2s ease-out forwards;
+}
+
+.animate-fade-out {
+  animation: fadeOut 0.2s ease-in forwards;
+}
+
+.animate-pulse-custom {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+.animate-scale-in {
+  animation: scaleIn 0.2s ease-out forwards;
+}
+
+/* =============================================================================
+   Focus Ring Utilities for Accessibility
+   ============================================================================= */
+
+.focus-ring {
+  @apply focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-slate-900;
+}
+
+.focus-ring-inset {
+  @apply focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-inset;
+}
+
+.focus-visible-ring {
+  @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900;
+}
+
+/* =============================================================================
+   Card Hover and Active State Transitions
+   ============================================================================= */
+
+.card-interactive {
+  @apply transition-all duration-200 ease-in-out;
+}
+
+.card-interactive:hover {
+  @apply bg-slate-750 border-slate-600 shadow-lg shadow-black/20;
+}
+
+.card-interactive:active {
+  @apply scale-[0.99] shadow-md;
+}
+
+/* Card with glow effect on hover */
+.card-glow {
+  @apply transition-all duration-300;
+}
+
+.card-glow:hover {
+  box-shadow:
+    0 0 0 1px rgba(59, 130, 246, 0.3),
+    0 4px 20px rgba(0, 0, 0, 0.4);
+}
+
+/* =============================================================================
+   Status Indicator Utilities
+   ============================================================================= */
+
+.status-online {
+  @apply bg-green-500;
+  box-shadow: 0 0 8px rgba(34, 197, 94, 0.5);
+}
+
+.status-offline {
+  @apply bg-slate-500;
+}
+
+.status-warning {
+  @apply bg-yellow-500;
+  box-shadow: 0 0 8px rgba(234, 179, 8, 0.5);
+}
+
+.status-error {
+  @apply bg-red-500;
+  box-shadow: 0 0 8px rgba(239, 68, 68, 0.5);
+}
+
+/* Pulsing status dot */
+.status-pulse {
+  @apply relative;
+}
+
+.status-pulse::after {
+  content: '';
+  @apply absolute inset-0 rounded-full;
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  background: inherit;
+}
+
+/* =============================================================================
+   Link and Interactive Element Styles
+   ============================================================================= */
+
+.link {
+  @apply text-blue-400 hover:text-blue-300 transition-colors underline-offset-2 hover:underline;
+}
+
+.link-muted {
+  @apply text-slate-400 hover:text-slate-300 transition-colors;
+}
+
+/* =============================================================================
+   Selection Styling
+   ============================================================================= */
+
+::selection {
+  background-color: rgba(59, 130, 246, 0.4);
+  color: white;
+}
+
+::-moz-selection {
+  background-color: rgba(59, 130, 246, 0.4);
+  color: white;
+}
+
+/* =============================================================================
+   Form Element Dark Theme Overrides
+   ============================================================================= */
+
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+textarea:-webkit-autofill,
+textarea:-webkit-autofill:hover,
+textarea:-webkit-autofill:focus,
+select:-webkit-autofill,
+select:-webkit-autofill:hover,
+select:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0 1000px #1e293b inset !important;
+  -webkit-text-fill-color: #ffffff !important;
+  caret-color: #ffffff;
+}
+
+/* =============================================================================
+   Utility Classes
+   ============================================================================= */
+
+/* Text truncation with ellipsis */
+.truncate-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.truncate-3 {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Glass effect for overlays */
+.glass {
+  background: rgba(30, 41, 59, 0.8);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+/* Subtle border glow */
+.border-glow-blue {
+  box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.5);
+}
+
+.border-glow-green {
+  box-shadow: 0 0 0 1px rgba(34, 197, 94, 0.5);
+}
+
+.border-glow-red {
+  box-shadow: 0 0 0 1px rgba(239, 68, 68, 0.5);
 }
