@@ -8,3 +8,4 @@ export { useDevices } from './useDevices';
 export { useMessages } from './useMessages';
 export { useValidation, rules } from './useValidation';
 export { useNetworkStatus, type NetworkStatus } from './useNetworkStatus';
+export { useSoundNotification, type SoundType } from './useSoundNotification';
