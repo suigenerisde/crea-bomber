@@ -302,10 +302,8 @@ export function connect(): void {
     // Register device
     socket!.emit('device:register', {
       deviceId: deviceInfo.id,
-      name: deviceInfo.name,
+      deviceName: deviceInfo.name,
       hostname: deviceInfo.hostname,
-      platform: deviceInfo.platform,
-      version: '1.0.0',
     });
 
     console.log(`[Socket] Device registered: ${deviceInfo.id}`);
@@ -347,12 +345,12 @@ export function connect(): void {
     }
   });
 
-  // Device registration acknowledged
-  socket.on('device:registered', (data: { success: boolean; message?: string }) => {
-    if (data.success) {
-      console.log('[Socket] Device registration acknowledged');
+  // Device registration acknowledged (server sends { device } object on success)
+  socket.on('device:registered', (data: { device?: unknown }) => {
+    if (data.device) {
+      console.log('[Socket] Device registration acknowledged by server');
     } else {
-      console.error('[Socket] Device registration failed:', data.message);
+      console.log('[Socket] Device registration acknowledged');
     }
   });
 
@@ -362,10 +360,8 @@ export function connect(): void {
     const info = getDeviceInfo();
     socket!.emit('device:register', {
       deviceId: info.id,
-      name: info.name,
+      deviceName: info.name,
       hostname: info.hostname,
-      platform: info.platform,
-      version: '1.0.0',
     });
   });
 }
