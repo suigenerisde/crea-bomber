@@ -51,3 +51,7 @@ next-env.d.ts
 /client/release
 /client/*.dmg
 /client/*.zip
+
+# PM2 logs (keep .gitkeep)
+/logs/*.log
+!/logs/.gitkeep

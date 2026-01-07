@@ -85,13 +85,34 @@ This final phase adds polish, improves reliability, and prepares CreaBomber for 
   - Added Escape key handling to DeviceDetailModal and MessageDetailModal (PreviewModal already had it)
   - Tab navigation works natively through form fields (standard browser behavior)
 
-- [ ] Create deployment configuration for internal network:
+- [x] Create deployment configuration for internal network:
   - Environment variables: SERVER_PORT, DATABASE_PATH, CORS_ORIGINS
   - Create .env.example with documentation
   - Production build script: `npm run build` for Next.js
   - PM2 or systemd configuration for running server as daemon
   - Document how to update CORS_ORIGINS for client connections
   - Firewall considerations for WebSocket connections
+
+  **Implementation Notes (completed 2025-01-07):**
+  - Created `.env.example` with documented environment variables:
+    - `PORT` (default: 3000), `HOSTNAME` (0.0.0.0 for network access)
+    - `DATABASE_PATH` (configurable SQLite location)
+    - `CORS_ORIGINS` (comma-separated allowed origins)
+    - `LOG_LEVEL`, `OFFLINE_TIMEOUT` for fine-tuning
+  - Created `ecosystem.config.js` PM2 configuration with:
+    - Production/development environments
+    - Auto-restart, memory limits, logging
+    - Graceful shutdown and PM2 ready signaling
+  - Updated `server.ts` to use environment variables and pass CORS config to socket-server
+  - Updated `src/lib/socket-server.ts` to accept configurable CORS origins
+  - Updated `src/lib/db.ts` to use `DATABASE_PATH` env var with directory auto-creation
+  - Added PM2 scripts to `package.json`: `pm2:start`, `pm2:stop`, `pm2:restart`, `pm2:logs`, `pm2:status`
+  - Created `logs/` directory with `.gitkeep` for PM2 logs
+  - Comprehensive `README.md` with:
+    - Production deployment guide (env setup, CORS config, PM2 commands)
+    - Firewall configuration for macOS/Linux
+    - Architecture diagram
+    - Troubleshooting section
 
 - [ ] Create client distribution package:
   - Build signed macOS app (or unsigned for internal use)

@@ -5,6 +5,7 @@
 
 import Database from 'better-sqlite3';
 import path from 'path';
+import fs from 'fs';
 import { v4 as uuidv4 } from 'uuid';
 import type {
   Device,
@@ -19,8 +20,16 @@ import type {
   MessageType,
 } from '@/types';
 
-// Database path
-const DB_PATH = path.join(process.cwd(), 'data', 'creabomber.db');
+// Database path - configurable via environment variable
+const DB_PATH = process.env.DATABASE_PATH
+  ? path.resolve(process.env.DATABASE_PATH)
+  : path.join(process.cwd(), 'data', 'creabomber.db');
+
+// Ensure database directory exists
+const dbDir = path.dirname(DB_PATH);
+if (!fs.existsSync(dbDir)) {
+  fs.mkdirSync(dbDir, { recursive: true });
+}
 
 // Initialize database connection
 const db = new Database(DB_PATH);

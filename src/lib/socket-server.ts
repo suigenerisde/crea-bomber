@@ -38,13 +38,20 @@ let io: Server | null = null;
 
 /**
  * Initialize Socket.io server with the given HTTP server
+ * @param httpServer - HTTP server to attach to
+ * @param corsOrigins - Array of allowed CORS origins
  */
-export function initSocketServer(httpServer: HttpServer): Server {
+export function initSocketServer(httpServer: HttpServer, corsOrigins?: string[]): Server {
+  const origins = corsOrigins || ['http://localhost:3000', 'http://127.0.0.1:3000'];
+
   io = new Server(httpServer, {
     cors: {
-      origin: ['http://localhost:3000', 'http://127.0.0.1:3000'],
+      origin: origins,
       methods: ['GET', 'POST'],
     },
+    // Connection settings for reliable internal network communication
+    pingTimeout: 30000,
+    pingInterval: 10000,
   });
 
   io.on('connection', (socket: Socket) => {
