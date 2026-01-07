@@ -204,6 +204,11 @@ body {
   height: 128px;
   object-fit: cover;
   display: block;
+  transition: opacity 0.3s ease;
+}
+
+.video-thumb-img.loading {
+  opacity: 0.5;
 }
 
 .video-play-overlay {
@@ -370,9 +375,27 @@ body {
   border: 1px solid rgba(239, 68, 68, 0.3);
 }
 
+.notification-error svg {
+  flex-shrink: 0;
+  color: #fca5a5; /* red-300 */
+}
+
 .notification-error-text {
   font-size: 13px;
   color: #fca5a5; /* red-300 */
+}
+
+/* Audio error state */
+.notification-audio-container.error .audio-icon {
+  background: rgba(239, 68, 68, 0.2);
+}
+
+.notification-audio-container.error .audio-icon svg {
+  color: #fca5a5;
+}
+
+.notification-audio-container.error .audio-bar {
+  background: rgba(100, 116, 139, 0.3);
 }
 
 /* Utility classes */

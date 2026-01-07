@@ -173,9 +173,20 @@ function resetContent() {
   audioContainer.classList.add('hidden');
 
   // Reset text
-  textContent.textContent = '';
+  textContent.innerHTML = '';
 
-  // Reset image
+  // Reset image - restore original structure if it was replaced by error
+  if (!imageContainer.querySelector('.notification-image')) {
+    imageContainer.innerHTML = `
+      <div id="image-loading" class="loading-indicator">
+        <div class="loading-spinner"></div>
+      </div>
+      <img id="image-content" class="notification-image" alt="Notification image">
+    `;
+    // Re-acquire references
+    window.imageLoading = document.getElementById('image-loading');
+    window.imageContent = document.getElementById('image-content');
+  }
   imageContent.src = '';
   imageContent.classList.remove('loaded');
   imageContent.classList.add('loading');
@@ -183,17 +194,64 @@ function resetContent() {
 
   // Reset video
   videoThumbImg.src = '';
+  videoThumbImg.classList.remove('loading');
 
-  // Reset audio
+  // Reset audio - clean up event handlers and state
   audioPlayer.pause();
   audioPlayer.src = '';
+  audioPlayer.oncanplaythrough = null;
+  audioPlayer.onerror = null;
+  audioPlayer.onplay = null;
+  audioPlayer.onpause = null;
+  audioPlayer.onended = null;
   audioAutoplayBadge.classList.add('hidden');
+
+  // Reset audio label
+  const audioLabel = audioContainer.querySelector('.audio-label');
+  if (audioLabel) {
+    audioLabel.textContent = 'Audio message';
+  }
+
+  // Reset audio icon styles (in case of error state)
+  const audioIcon = audioContainer.querySelector('.audio-icon');
+  if (audioIcon) {
+    audioIcon.style.background = '';
+    const svg = audioIcon.querySelector('svg');
+    if (svg) svg.style.color = '';
+  }
+
+  // Reset waveform bar styles
+  const bars = audioWaveform.querySelectorAll('.audio-bar');
+  bars.forEach(bar => {
+    bar.style.background = '';
+    bar.classList.remove('animated');
+  });
+
+  audioContainer.onclick = null;
+  audioContainer.style.cursor = '';
 
   // Reset progress
   stopProgress();
   progressBar.style.transform = 'scaleX(1)';
 
   currentPayload = null;
+}
+
+/**
+ * Render text with proper line breaks
+ * Converts \n to <br> while escaping HTML
+ */
+function renderText(text) {
+  if (!text) return '';
+  // Escape HTML entities to prevent XSS
+  const escaped = text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+  // Convert line breaks to <br> tags
+  return escaped.replace(/\n/g, '<br>');
 }
 
 /**
@@ -211,11 +269,11 @@ function showNotification(payload) {
   // Set timestamp
   timestamp.textContent = formatTime(new Date());
 
-  // Set text content
+  // Set text content with proper line break support
   if (payload.content) {
-    textContent.textContent = payload.content;
+    textContent.innerHTML = renderText(payload.content);
   } else {
-    textContent.textContent = '';
+    textContent.innerHTML = '';
   }
 
   // Handle different message types
@@ -283,7 +341,7 @@ function hideNotification() {
 }
 
 /**
- * Show image content
+ * Show image content with loading state and max dimensions
  */
 function showImage(imageUrl) {
   imageContainer.classList.remove('hidden');
@@ -291,41 +349,102 @@ function showImage(imageUrl) {
   // Show loading state
   imageLoading.classList.remove('hidden');
   imageContent.classList.add('loading');
+  imageContent.classList.remove('loaded');
 
-  // Load image
-  imageContent.onload = () => {
+  // Create a new image to preload and check dimensions
+  const tempImg = new Image();
+
+  tempImg.onload = () => {
+    // Image loaded successfully - update the display
     imageLoading.classList.add('hidden');
+    imageContent.src = imageUrl;
     imageContent.classList.remove('loading');
     imageContent.classList.add('loaded');
+
+    console.log('[Renderer] Image loaded:', tempImg.naturalWidth, 'x', tempImg.naturalHeight);
   };
 
-  imageContent.onerror = () => {
+  tempImg.onerror = () => {
     console.error('[Renderer] Failed to load image:', imageUrl);
     imageLoading.classList.add('hidden');
-    // Show error state
-    imageContainer.innerHTML = '<div class="notification-error"><span class="notification-error-text">Failed to load image</span></div>';
+    imageContent.classList.remove('loading');
+
+    // Show error state with icon
+    imageContainer.innerHTML = `
+      <div class="notification-error">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"></circle>
+          <line x1="12" y1="8" x2="12" y2="12"></line>
+          <line x1="12" y1="16" x2="12.01" y2="16"></line>
+        </svg>
+        <span class="notification-error-text">Failed to load image</span>
+      </div>
+    `;
   };
 
-  imageContent.src = imageUrl;
+  // Start loading the image
+  tempImg.src = imageUrl;
 }
 
 /**
- * Show video thumbnail
+ * Create video placeholder SVG with custom text
+ */
+function createVideoPlaceholder(text = 'Video') {
+  const svg = `<svg width="320" height="128" xmlns="http://www.w3.org/2000/svg">
+    <rect width="100%" height="100%" fill="#1e293b"/>
+    <circle cx="160" cy="55" r="24" fill="rgba(59, 130, 246, 0.2)"/>
+    <polygon points="155,45 155,65 170,55" fill="#60a5fa"/>
+    <text x="50%" y="100" dominant-baseline="middle" text-anchor="middle" fill="#94a3b8" font-family="sans-serif" font-size="12">${text}</text>
+  </svg>`;
+  return `data:image/svg+xml;base64,${btoa(svg)}`;
+}
+
+/**
+ * Detect video source type from URL
+ */
+function getVideoSourceType(url) {
+  if (!url) return 'unknown';
+  if (getYouTubeVideoId(url)) return 'youtube';
+  if (getLoomVideoId(url)) return 'loom';
+  if (getVimeoVideoId(url)) return 'vimeo';
+  return 'unknown';
+}
+
+/**
+ * Show video thumbnail with loading state
  */
 function showVideo(videoUrl) {
   videoContainer.classList.remove('hidden');
 
+  const sourceType = getVideoSourceType(videoUrl);
   const thumbnailUrl = getThumbnailUrl(videoUrl);
 
+  // Show loading state initially
+  videoThumbImg.classList.add('loading');
+
   if (thumbnailUrl) {
-    videoThumbImg.src = thumbnailUrl;
-    videoThumbImg.onerror = () => {
-      // Use a placeholder if thumbnail fails
-      videoThumbImg.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzIwIiBoZWlnaHQ9IjEyOCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjMWUyOTNiIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGRvbWluYW50LWJhc2VsaW5lPSJtaWRkbGUiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZpbGw9IiM2NDc0OGIiIGZvbnQtZmFtaWx5PSJzYW5zLXNlcmlmIiBmb250LXNpemU9IjE0Ij5WaWRlbzwvdGV4dD48L3N2Zz4=';
+    // Create temp image to preload thumbnail
+    const tempThumb = new Image();
+
+    tempThumb.onload = () => {
+      videoThumbImg.src = thumbnailUrl;
+      videoThumbImg.classList.remove('loading');
+      console.log('[Renderer] Video thumbnail loaded for', sourceType);
     };
+
+    tempThumb.onerror = () => {
+      console.warn('[Renderer] Thumbnail failed to load, using placeholder');
+      // Use a placeholder with source name if thumbnail fails
+      const placeholderText = sourceType === 'unknown' ? 'Click to play video' : `${sourceType.charAt(0).toUpperCase() + sourceType.slice(1)} Video`;
+      videoThumbImg.src = createVideoPlaceholder(placeholderText);
+      videoThumbImg.classList.remove('loading');
+    };
+
+    tempThumb.src = thumbnailUrl;
   } else {
     // Placeholder for unknown video sources
-    videoThumbImg.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzIwIiBoZWlnaHQ9IjEyOCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjMWUyOTNiIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGRvbWluYW50LWJhc2VsaW5lPSJtaWRkbGUiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZpbGw9IiM2NDc0OGIiIGZvbnQtZmFtaWx5PSJzYW5zLXNlcmlmIiBmb250LXNpemU9IjE0Ij5WaWRlbzwvdGV4dD48L3N2Zz4=';
+    videoThumbImg.src = createVideoPlaceholder('Click to play video');
+    videoThumbImg.classList.remove('loading');
   }
 
   // Handle click to open video in browser
@@ -335,7 +454,7 @@ function showVideo(videoUrl) {
 }
 
 /**
- * Show audio player
+ * Show audio player with loading state and error handling
  */
 function showAudio(audioUrl, autoplay = false) {
   audioContainer.classList.remove('hidden');
@@ -348,16 +467,52 @@ function showAudio(audioUrl, autoplay = false) {
     audioAutoplayBadge.classList.remove('hidden');
   }
 
+  // Add loading indicator to waveform
+  const audioLabel = audioContainer.querySelector('.audio-label');
+  if (audioLabel) {
+    audioLabel.textContent = 'Loading audio...';
+  }
+
   // Set audio source
   audioPlayer.src = audioUrl;
 
-  // Handle audio playback
-  if (autoplay) {
-    audioPlayer.play().catch(err => {
-      console.warn('[Renderer] Auto-play blocked:', err);
-      // Browser may block autoplay - user will need to interact
+  // Handle successful audio load
+  audioPlayer.oncanplaythrough = () => {
+    console.log('[Renderer] Audio ready to play');
+    if (audioLabel) {
+      audioLabel.textContent = 'Audio message';
+    }
+
+    // Auto-play if enabled
+    if (autoplay) {
+      audioPlayer.play().catch(err => {
+        console.warn('[Renderer] Auto-play blocked:', err);
+        if (audioLabel) {
+          audioLabel.textContent = 'Click to play';
+        }
+      });
+    }
+  };
+
+  // Handle audio load error
+  audioPlayer.onerror = (e) => {
+    console.error('[Renderer] Failed to load audio:', audioUrl, e);
+    if (audioLabel) {
+      audioLabel.textContent = 'Failed to load audio';
+    }
+    // Gray out the waveform to indicate error
+    const bars = audioWaveform.querySelectorAll('.audio-bar');
+    bars.forEach(bar => {
+      bar.style.background = 'rgba(100, 116, 139, 0.3)';
     });
-  }
+    // Update icon color to indicate error
+    const audioIcon = audioContainer.querySelector('.audio-icon');
+    if (audioIcon) {
+      audioIcon.style.background = 'rgba(239, 68, 68, 0.2)';
+      const svg = audioIcon.querySelector('svg');
+      if (svg) svg.style.color = '#fca5a5';
+    }
+  };
 
   // Animate waveform when playing
   audioPlayer.onplay = () => {
@@ -366,18 +521,40 @@ function showAudio(audioUrl, autoplay = false) {
       bar.classList.add('animated');
       bar.style.animationDelay = `${i * 0.05}s`;
     });
+    if (audioLabel) {
+      audioLabel.textContent = 'Playing...';
+    }
   };
 
   audioPlayer.onpause = () => {
     const bars = audioWaveform.querySelectorAll('.audio-bar');
     bars.forEach(bar => bar.classList.remove('animated'));
+    if (audioLabel && !audioPlayer.error) {
+      audioLabel.textContent = 'Audio message';
+    }
+  };
+
+  audioPlayer.onended = () => {
+    const bars = audioWaveform.querySelectorAll('.audio-bar');
+    bars.forEach(bar => bar.classList.remove('animated'));
+    if (audioLabel) {
+      audioLabel.textContent = 'Finished';
+    }
   };
 
   // Make audio container clickable to toggle playback
   audioContainer.onclick = (e) => {
+    // Don't play if there was a load error
+    if (audioPlayer.error) {
+      console.warn('[Renderer] Cannot play - audio failed to load');
+      return;
+    }
+
     if (e.target === audioContainer || e.target.closest('.audio-icon') || e.target.closest('.audio-waveform')) {
       if (audioPlayer.paused) {
-        audioPlayer.play().catch(() => {});
+        audioPlayer.play().catch((err) => {
+          console.warn('[Renderer] Play failed:', err);
+        });
       } else {
         audioPlayer.pause();
       }
