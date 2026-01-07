@@ -25,13 +25,14 @@ This phase completes the web dashboard by building out all pages, creating the R
   - Use useDevices and useMessages hooks for data
   ✅ Completed: Full dashboard with stats cards (4), quick actions, recent activity (last 5 messages), device status overview, real-time socket connection indicator, and responsive grid layout
 
-- [ ] Build the Compose page (src/app/compose/page.tsx):
+- [x] Build the Compose page (src/app/compose/page.tsx):
   - Two-column layout on large screens: Composer left, Device Selector right
   - MessageComposer component with all message type forms
   - DeviceSelector showing available devices with online indicators
   - Bottom action bar: "Preview" button opens PreviewModal, "Send to X devices" button (X = selected count)
   - Send flow: validates payload, opens confirmation in PreviewModal, on confirm calls createMessage, shows success toast, redirects to history
   - Loading state during send
+  ✅ Completed: Full Compose page with real-time device fetching via useSocket/useDevices hooks, createMessage integration via useMessages hook, toast notifications for success/error, loading overlay during send, validation requiring device selection, and automatic redirect to /history after successful send
 
 - [ ] Build the Devices page (src/app/devices/page.tsx):
   - DeviceList component showing all registered devices
