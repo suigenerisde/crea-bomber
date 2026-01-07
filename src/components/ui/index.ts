@@ -20,3 +20,4 @@ export {
 } from './Skeleton';
 export { SuccessAnimation, SuccessCheck } from './SuccessAnimation';
 export { NotificationBadge, NotificationDot } from './NotificationBadge';
+export { KeyboardShortcutsHelp } from './KeyboardShortcutsHelp';

@@ -2,9 +2,10 @@
 
 import { useEffect, useRef } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { formatDistanceToNow } from 'date-fns';
-import { useSocket, useDevices, useMessages } from '@/hooks';
-import { Card, Badge, Button, PageTransition, StatsRowSkeleton, Skeleton } from '@/components/ui';
+import { useSocket, useDevices, useMessages, useKeyboardShortcuts } from '@/hooks';
+import { Card, Badge, Button, PageTransition, StatsRowSkeleton, Skeleton, KeyboardShortcutsHelp } from '@/components/ui';
 import { useToast } from '@/contexts';
 import { MessageType, type Device, type Message } from '@/types';
 
@@ -128,11 +129,22 @@ function DeviceStatusItem({ device }: { device: Device }) {
 }
 
 export default function DashboardPage() {
+  const router = useRouter();
   const toast = useToast();
   const { socket, status: socketStatus, isConnected } = useSocket();
   const { devices, onlineCount, offlineCount, loading: devicesLoading } = useDevices({ socket });
   const { messages, loading: messagesLoading } = useMessages({ socket, initialLimit: 5 });
   const wasConnectedRef = useRef(true);
+
+  // Keyboard shortcuts: Cmd+N to compose new message
+  useKeyboardShortcuts([
+    {
+      key: 'n',
+      metaKey: true,
+      action: () => router.push('/compose'),
+      description: 'Compose new message',
+    },
+  ]);
 
   // Show warning toast when connection is lost
   useEffect(() => {
@@ -174,17 +186,20 @@ export default function DashboardPage() {
               Welcome to CreaBomber - your internal push notification system
             </p>
           </div>
-          <div className="flex items-center gap-2">
-            <span
-              className={`w-2 h-2 rounded-full transition-colors ${
-                socketStatus === 'connected'
-                  ? 'bg-green-500'
-                  : socketStatus === 'connecting' || socketStatus === 'reconnecting'
-                    ? 'bg-yellow-500 animate-pulse'
-                    : 'bg-red-500'
-              }`}
-            />
-            <span className="text-xs text-slate-400 capitalize">{socketStatus}</span>
+          <div className="flex items-center gap-3">
+            <KeyboardShortcutsHelp />
+            <div className="flex items-center gap-2">
+              <span
+                className={`w-2 h-2 rounded-full transition-colors ${
+                  socketStatus === 'connected'
+                    ? 'bg-green-500'
+                    : socketStatus === 'connecting' || socketStatus === 'reconnecting'
+                      ? 'bg-yellow-500 animate-pulse'
+                      : 'bg-red-500'
+                }`}
+              />
+              <span className="text-xs text-slate-400 capitalize">{socketStatus}</span>
+            </div>
           </div>
         </div>
 

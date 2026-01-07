@@ -1,12 +1,12 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { MessageComposer, MessageComposerRef, MessageData } from '@/components/messages';
 import { PreviewModal } from '@/components/preview';
 import { DeviceSelector } from '@/components/devices';
 import { Card, Badge, PageTransition, SuccessAnimation, SkeletonDeviceCard } from '@/components/ui';
-import { useSocket, useDevices, useMessages, useSoundNotification } from '@/hooks';
+import { useSocket, useDevices, useMessages, useSoundNotification, useKeyboardShortcuts } from '@/hooks';
 import { useToast } from '@/contexts';
 
 export default function ComposePage() {
@@ -35,7 +35,7 @@ export default function ComposePage() {
     setPreviewOpen(true);
   };
 
-  const handleSend = async (data: MessageData) => {
+  const handleSend = useCallback(async (data: MessageData) => {
     if (selectedDevices.length === 0) {
       toast.error('Please select at least one device');
       playError();
@@ -70,7 +70,25 @@ export default function ComposePage() {
       playError();
       setIsSending(false);
     }
-  };
+  }, [selectedDevices, toast, playError, playSend, playSuccess, createMessage, router]);
+
+  // Handler to trigger send via keyboard shortcut
+  const handleKeyboardSend = useCallback(() => {
+    if (composerRef.current?.isValid() && selectedDevices.length > 0 && !isSending && !creating) {
+      const data = composerRef.current.getMessageData();
+      handleSend(data);
+    }
+  }, [selectedDevices, isSending, creating, handleSend]);
+
+  // Keyboard shortcuts: Cmd+Enter to send message
+  useKeyboardShortcuts([
+    {
+      key: 'Enter',
+      metaKey: true,
+      action: handleKeyboardSend,
+      description: 'Send message',
+    },
+  ]);
 
   const handlePreviewSend = () => {
     if (previewMessage) {

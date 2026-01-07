@@ -64,12 +64,26 @@ This final phase adds polish, improves reliability, and prepares CreaBomber for 
     - Delivery summary (X of Y delivered)
   - Updated `MessageHistoryItem` and dashboard to show partial status as "X/Y" format
 
-- [ ] Add keyboard shortcuts for power users:
+- [x] Add keyboard shortcuts for power users:
   - Dashboard: Cmd+N to compose new message
   - Compose page: Cmd+Enter to send (when valid)
   - Escape to close modals
   - Tab navigation through form fields
   - Document shortcuts in a help tooltip
+
+  **Implementation Notes (completed 2025-01-07):**
+  - Created `src/hooks/useKeyboardShortcuts.ts` with:
+    - `useKeyboardShortcuts` hook for configurable keyboard shortcuts with modifier key support (meta, ctrl, shift, alt)
+    - `useEscapeKey` convenience hook for modal closing
+    - `formatShortcut` helper to display shortcuts in Mac/Windows format
+  - Created `src/components/ui/KeyboardShortcutsHelp.tsx` - modal component showing all available shortcuts:
+    - Toggleable via keyboard icon button in header
+    - Shows shortcuts with Mac (⌘) or Windows (Ctrl+) formatting based on platform
+    - Accessible via Cmd+? / Ctrl+? global shortcut
+  - Updated Dashboard (`src/app/page.tsx`) with Cmd+N shortcut to navigate to compose page and keyboard help button
+  - Updated Compose page (`src/app/compose/page.tsx`) with Cmd+Enter to send message when form is valid
+  - Added Escape key handling to DeviceDetailModal and MessageDetailModal (PreviewModal already had it)
+  - Tab navigation works natively through form fields (standard browser behavior)
 
 - [ ] Create deployment configuration for internal network:
   - Environment variables: SERVER_PORT, DATABASE_PATH, CORS_ORIGINS

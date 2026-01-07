@@ -5,6 +5,7 @@ import { formatDistanceToNow, format } from 'date-fns';
 import { clsx } from 'clsx';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
+import { useEscapeKey } from '@/hooks';
 import type { Device } from '@/types';
 
 interface DeviceDetailModalProps {
@@ -22,6 +23,9 @@ export function DeviceDetailModal({
 }: DeviceDetailModalProps) {
   const [isRemoving, setIsRemoving] = useState(false);
   const [showConfirmRemove, setShowConfirmRemove] = useState(false);
+
+  // Close on Escape key
+  useEscapeKey(onClose, isOpen);
 
   if (!isOpen) return null;
 

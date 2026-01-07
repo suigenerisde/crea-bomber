@@ -4,6 +4,7 @@ import { format, formatDistanceToNow } from 'date-fns';
 import { clsx } from 'clsx';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
+import { useEscapeKey } from '@/hooks';
 import { MessageType, type Message, type Device, type DeviceDeliveryStatus } from '@/types';
 
 interface MessageDetailModalProps {
@@ -48,6 +49,9 @@ export function MessageDetailModal({
   isOpen,
   onClose,
 }: MessageDetailModalProps) {
+  // Close on Escape key
+  useEscapeKey(onClose, isOpen);
+
   if (!isOpen) return null;
 
   const createdAt =
