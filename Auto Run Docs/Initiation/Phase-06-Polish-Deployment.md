@@ -114,12 +114,29 @@ This final phase adds polish, improves reliability, and prepares CreaBomber for 
     - Architecture diagram
     - Troubleshooting section
 
-- [ ] Create client distribution package:
+- [x] Create client distribution package:
   - Build signed macOS app (or unsigned for internal use)
   - Create DMG installer with drag-to-Applications flow
   - Include README with setup instructions
   - Auto-update mechanism consideration (for future)
   - Document how to configure server URL on first launch
+
+  **Implementation Notes (completed 2025-01-07):**
+  - DMG installer built with electron-builder: `release/CreaBomber-1.0.0-arm64.dmg` (~106 MB)
+  - ZIP archive also available: `release/CreaBomber-1.0.0-arm64-mac.zip`
+  - DMG configured with drag-to-Applications flow via `package.json` build config
+  - App is unsigned (identity: null) for internal use - users need to right-click → Open on first launch
+  - Created comprehensive `client/README.md` with:
+    - Installation instructions for DMG and ZIP
+    - First launch configuration guide (tray icon → Settings → Server URL)
+    - Tray menu documentation
+    - Notification types and durations
+    - Troubleshooting section (connection issues, notifications, reset to defaults)
+    - Development setup instructions
+    - Future auto-update considerations documented (electron-updater with self-hosted server)
+  - Server URL configuration via Settings window accessible from system tray
+  - Config stored in `~/Library/Application Support/creabomber-client/config.json`
+  - Build command: `npm run build:mac` in client directory
 
 - [ ] Create internal documentation in docs/ folder:
   - docs/README.md: Project overview, architecture diagram (text-based)
