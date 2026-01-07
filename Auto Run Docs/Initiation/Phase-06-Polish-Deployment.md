@@ -138,13 +138,22 @@ This final phase adds polish, improves reliability, and prepares CreaBomber for 
   - Config stored in `~/Library/Application Support/creabomber-client/config.json`
   - Build command: `npm run build:mac` in client directory
 
-- [ ] Create internal documentation in docs/ folder:
+- [x] Create internal documentation in docs/ folder:
   - docs/README.md: Project overview, architecture diagram (text-based)
   - docs/SETUP.md: How to run the server, prerequisites
   - docs/CLIENT.md: How to install and configure the Mac client
   - docs/API.md: API endpoints documentation (auto-generate if possible)
   - docs/TROUBLESHOOTING.md: Common issues and solutions
   - Use markdown with YAML front matter for doc organization
+
+  **Implementation Notes (completed 2025-01-07):**
+  - Created `docs/` folder with 5 comprehensive documentation files
+  - `docs/README.md`: Project overview with architecture diagram, message flow, technology stack, and project structure
+  - `docs/SETUP.md`: Complete server setup guide including prerequisites, environment configuration, PM2 deployment, firewall setup
+  - `docs/CLIENT.md`: Mac client installation guide with configuration steps, tray menu documentation, and building from source
+  - `docs/API.md`: Full REST API reference with all endpoints (devices CRUD, messages CRUD), request/response formats, WebSocket events, TypeScript types, and cURL examples
+  - `docs/TROUBLESHOOTING.md`: Comprehensive troubleshooting guide with quick diagnostics, server issues, client issues, network issues, and complete reset procedures
+  - All documents use YAML front matter with type, title, created date, tags, and related document cross-references using wiki-link syntax
 
 - [ ] Final integration testing and validation:
   - Fresh install test: clone repo, follow SETUP.md, verify works
