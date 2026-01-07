@@ -23,10 +23,11 @@ This phase creates the reusable UI component library and application layout stru
   - Card hover and active state transitions
   ✅ Full dark theme with CSS variables, custom scrollbars, notification animations (slideInRight, slideOutRight, fadeIn, fadeOut, pulse, scaleIn), focus ring utilities, card interactive states, status indicators, glass effect, and border glow utilities
 
-- [ ] Create layout components in src/components/layout/:
+- [x] Create layout components in src/components/layout/:
   - Sidebar.tsx: fixed left sidebar (w-64), navigation links with icons (Home, Compose, Devices, History), active state highlighting, CreaBomber logo/title at top
   - Header.tsx: top bar with page title (dynamic), connection status indicator (Socket.io status), optional action buttons slot
   - MainLayout.tsx: combines Sidebar + Header + main content area with proper spacing, responsive container
+  ✅ Created all 3 layout components with barrel export in index.ts. Sidebar has navigation with active state highlighting, Header shows connection status (connected/disconnected/connecting), MainLayout combines both with proper 64px sidebar offset
 
 - [ ] Update src/app/layout.tsx to use MainLayout:
   - Import and wrap children with MainLayout component
