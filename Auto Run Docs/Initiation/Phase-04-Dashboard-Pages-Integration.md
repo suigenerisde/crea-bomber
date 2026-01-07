@@ -4,11 +4,12 @@ This phase completes the web dashboard by building out all pages, creating the R
 
 ## Tasks
 
-- [ ] Create API routes in src/app/api/:
+- [x] Create API routes in src/app/api/:
   - devices/route.ts: GET returns all devices from DB, POST creates new device (for manual registration)
   - devices/[id]/route.ts: GET single device, PATCH update device, DELETE remove device
   - messages/route.ts: GET returns paginated message history (limit, offset params), POST creates new message and triggers WebSocket broadcast
   - messages/[id]/route.ts: GET single message with full details
+  ✅ Completed: All API routes implemented with proper error handling, pagination, and filtering
 
 - [ ] Create React hooks for data management in src/hooks/:
   - useSocket.ts: manages Socket.io client connection, auto-reconnect logic, exposes socket instance and connection status, handles cleanup on unmount
