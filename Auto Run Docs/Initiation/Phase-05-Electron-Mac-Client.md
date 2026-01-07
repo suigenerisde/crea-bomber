@@ -13,7 +13,7 @@ This phase creates the macOS client application that runs on target devices. The
   - Configure package.json with main entry, build config for macOS (dmg, zip)
   > Completed: Created full Electron project structure with TypeScript support (tsconfig.json), electron-builder config for macOS (dmg, zip targets), proper npm scripts (start, build, build:mac, dev), and updated root .gitignore for client artifacts.
 
-- [ ] Create Electron main process in client/src/main/main.ts:
+- [x] Create Electron main process in client/src/main/main.ts:
   - Create BrowserWindow for notification overlay (frameless, transparent, alwaysOnTop)
   - Configure window: resizable false, skipTaskbar true, visibleOnAllWorkspaces true
   - Position window in top-right corner of screen
@@ -21,6 +21,7 @@ This phase creates the macOS client application that runs on target devices. The
   - Auto-hide after configurable timeout (default 8 seconds for text, longer for media)
   - Implement showNotification(payload) function that populates window and shows it
   - Handle multiple notifications: queue system or stack
+  > Completed: Created main.ts with frameless transparent BrowserWindow, positioned top-right. Implements notification queue system, auto-dismiss timeouts by message type (TEXT: 8s, IMAGE: 12s, VIDEO: 15s, AUDIO: 10s), IPC handlers for renderer communication, and dynamic window resizing. TypeScript compiles successfully.
 
 - [ ] Create device registration and WebSocket connection in client/src/main/socket.ts:
   - Generate or load persistent device ID using electron-store
