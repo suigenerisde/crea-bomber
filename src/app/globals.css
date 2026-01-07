@@ -177,6 +177,10 @@ body {
   animation: scaleIn 0.2s ease-out forwards;
 }
 
+.animate-slide-in {
+  animation: slideInRight 0.3s ease-out forwards;
+}
+
 /* =============================================================================
    Focus Ring Utilities for Accessibility
    ============================================================================= */
