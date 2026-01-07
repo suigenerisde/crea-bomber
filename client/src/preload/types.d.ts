@@ -86,16 +86,16 @@ interface CreaBomberAPI {
 
   /**
    * Get all settings (for settings window)
-   * @returns Promise resolving to settings object with serverUrl and connectionStatus
+   * @returns Promise resolving to settings object with serverUrl, connectionStatus, and openAtLogin
    */
-  getSettings: () => Promise<{ serverUrl: string; connectionStatus: ConnectionStatus }>;
+  getSettings: () => Promise<{ serverUrl: string; connectionStatus: ConnectionStatus; openAtLogin: boolean }>;
 
   /**
    * Save settings (for settings window)
    * @param settings Object containing settings to save
    * @returns Promise resolving to success indicator
    */
-  saveSettings: (settings: { serverUrl: string }) => Promise<{ success: boolean }>;
+  saveSettings: (settings: { serverUrl: string; openAtLogin?: boolean }) => Promise<{ success: boolean }>;
 
   /**
    * Close settings window

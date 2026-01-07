@@ -132,14 +132,14 @@ const creaBomberAPI = {
   /**
    * Get all settings (for settings window)
    */
-  getSettings: async (): Promise<{ serverUrl: string; connectionStatus: ConnectionStatus }> => {
+  getSettings: async (): Promise<{ serverUrl: string; connectionStatus: ConnectionStatus; openAtLogin: boolean }> => {
     return ipcRenderer.invoke('settings:get');
   },
 
   /**
    * Save settings (for settings window)
    */
-  saveSettings: async (settings: { serverUrl: string }): Promise<{ success: boolean }> => {
+  saveSettings: async (settings: { serverUrl: string; openAtLogin?: boolean }): Promise<{ success: boolean }> => {
     return ipcRenderer.invoke('settings:save', settings);
   },
 

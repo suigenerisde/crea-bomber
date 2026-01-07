@@ -9,6 +9,8 @@ import {
   getConnectionStatus,
   getServerUrl,
   setServerUrl,
+  getOpenAtLogin,
+  setOpenAtLogin,
   onStatusChange,
   reconnect,
   ConnectionStatus,
@@ -205,6 +207,18 @@ function openSettingsWindow(): void {
 }
 
 /**
+ * Apply the login item setting to the system
+ */
+function applyLoginItemSetting(enabled: boolean): void {
+  app.setLoginItemSettings({
+    openAtLogin: enabled,
+    openAsHidden: true, // Start minimized to tray
+    path: app.getPath('exe'),
+  });
+  console.log(`[Tray] Login item setting applied: ${enabled}`);
+}
+
+/**
  * Setup IPC handlers for settings window
  */
 function setupSettingsIPC(): void {
@@ -213,17 +227,26 @@ function setupSettingsIPC(): void {
     return {
       serverUrl: getServerUrl(),
       connectionStatus: getConnectionStatus(),
+      openAtLogin: getOpenAtLogin(),
     };
   });
 
   // Save settings
-  ipcMain.handle('settings:save', (_event, settings: { serverUrl: string }) => {
+  ipcMain.handle('settings:save', (_event, settings: { serverUrl: string; openAtLogin?: boolean }) => {
     const currentUrl = getServerUrl();
+    const currentOpenAtLogin = getOpenAtLogin();
 
+    // Update server URL if changed
     if (settings.serverUrl && settings.serverUrl !== currentUrl) {
       setServerUrl(settings.serverUrl);
       console.log('[Tray] Server URL updated, reconnecting...');
       reconnect();
+    }
+
+    // Update open at login if changed
+    if (typeof settings.openAtLogin === 'boolean' && settings.openAtLogin !== currentOpenAtLogin) {
+      setOpenAtLogin(settings.openAtLogin);
+      applyLoginItemSetting(settings.openAtLogin);
     }
 
     return { success: true };

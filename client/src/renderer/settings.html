@@ -164,6 +164,45 @@
       margin-top: 6px;
     }
 
+    .checkbox-group {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px;
+      background: #334155;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+
+    .checkbox-group:hover {
+      background: #3d4f69;
+    }
+
+    .checkbox-group input[type="checkbox"] {
+      width: 18px;
+      height: 18px;
+      accent-color: #3b82f6;
+      cursor: pointer;
+    }
+
+    .checkbox-group .checkbox-label {
+      flex: 1;
+    }
+
+    .checkbox-group .checkbox-label span {
+      display: block;
+      font-size: 14px;
+      font-weight: 500;
+      color: #f1f5f9;
+    }
+
+    .checkbox-group .checkbox-label small {
+      display: block;
+      font-size: 12px;
+      color: #64748b;
+      margin-top: 2px;
+    }
+
     .version {
       position: absolute;
       bottom: 16px;
@@ -192,6 +231,17 @@
       <label for="serverUrl">Dashboard Server URL</label>
       <input type="url" id="serverUrl" name="serverUrl" placeholder="http://localhost:3000" required>
       <p class="help-text">The URL of the CreaBomber dashboard server</p>
+    </div>
+
+    <div class="form-group">
+      <label>Startup</label>
+      <label class="checkbox-group" for="openAtLogin">
+        <input type="checkbox" id="openAtLogin" name="openAtLogin">
+        <div class="checkbox-label">
+          <span>Start at login</span>
+          <small>Automatically launch CreaBomber when you log in</small>
+        </div>
+      </label>
     </div>
 
     <div class="button-group">

@@ -84,12 +84,22 @@ This phase creates the macOS client application that runs on target devices. The
   > - Integrated tray initialization/cleanup in main.ts
   > TypeScript builds successfully.
 
-- [ ] Create macOS app configuration and icons:
+- [x] Create macOS app configuration and icons:
   - Design or generate app icon (1024x1024 for macOS)
   - Create client/build/icon.icns for macOS app bundle
   - Configure electron-builder for macOS: category, app ID (com.suigeneris.creabomber-client)
   - Set app to start on login (optional, configurable in settings)
   - Code signing placeholder (for future distribution)
+  > Completed: Created comprehensive macOS app configuration:
+  > - Generated 1024x1024 SVG icon (stylized "CB" bomb design with blue theme, spark/fuse animation effect)
+  > - Converted to icon.icns (488KB) with all required sizes (16x16 to 512x512@2x) using rsvg-convert + iconutil
+  > - Updated electron-builder config with hardenedRuntime, entitlements.mac.plist, DMG layout with Applications link
+  > - Created entitlements plist with network.client, JIT permissions for code signing
+  > - Added "Start at login" checkbox to settings UI (settings.html/js)
+  > - Implemented app.setLoginItemSettings() in tray.ts with openAsHidden option
+  > - Added openAtLogin to store schema with getter/setter functions
+  > - Updated preload API types and IPC handlers for the new setting
+  > TypeScript builds successfully.
 
 - [ ] Build and test the Electron client:
   - Add npm scripts: "start" for dev, "build" for production

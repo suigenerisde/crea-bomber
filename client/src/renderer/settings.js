@@ -7,6 +7,7 @@
 const statusDot = document.getElementById('statusDot');
 const statusText = document.getElementById('statusText');
 const serverUrlInput = document.getElementById('serverUrl');
+const openAtLoginCheckbox = document.getElementById('openAtLogin');
 const settingsForm = document.getElementById('settingsForm');
 const cancelBtn = document.getElementById('cancelBtn');
 const saveBtn = document.getElementById('saveBtn');
@@ -41,6 +42,7 @@ async function loadSettings() {
 
     if (settings) {
       serverUrlInput.value = settings.serverUrl || '';
+      openAtLoginCheckbox.checked = settings.openAtLogin || false;
       updateStatusUI(settings.connectionStatus);
     }
   } catch (error) {
@@ -50,6 +52,7 @@ async function loadSettings() {
       const serverUrl = await window.creaBomber.getServerUrl();
       const status = await window.creaBomber.getConnectionStatus();
       serverUrlInput.value = serverUrl || '';
+      openAtLoginCheckbox.checked = false;
       updateStatusUI(status);
     } catch (e) {
       console.error('Fallback also failed:', e);
@@ -85,7 +88,8 @@ async function saveSettings(event) {
   saveBtn.textContent = 'Saving...';
 
   try {
-    const result = await window.creaBomber.saveSettings({ serverUrl });
+    const openAtLogin = openAtLoginCheckbox.checked;
+    const result = await window.creaBomber.saveSettings({ serverUrl, openAtLogin });
 
     if (result && result.success) {
       // Settings saved successfully, close window

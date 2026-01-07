@@ -23,6 +23,7 @@ interface StoreSchema {
   serverUrl: string;
   notificationDuration: number;
   soundEnabled: boolean;
+  openAtLogin: boolean;
 }
 
 // Device info interface
@@ -110,6 +111,7 @@ function getStore(): SimpleStore {
       serverUrl: DEFAULT_SERVER_URL,
       notificationDuration: 8000,
       soundEnabled: true,
+      openAtLogin: false,
     });
   }
   return store;
@@ -194,6 +196,21 @@ export function getServerUrl(): string {
 export function setServerUrl(url: string): void {
   getStore().set('serverUrl', url);
   console.log(`[Socket] Server URL updated: ${url}`);
+}
+
+/**
+ * Get the openAtLogin setting from store
+ */
+export function getOpenAtLogin(): boolean {
+  return getStore().get('openAtLogin');
+}
+
+/**
+ * Set the openAtLogin setting
+ */
+export function setOpenAtLogin(enabled: boolean): void {
+  getStore().set('openAtLogin', enabled);
+  console.log(`[Socket] Open at login updated: ${enabled}`);
 }
 
 /**
