@@ -34,10 +34,11 @@ This phase creates the macOS client application that runs on target devices. The
   - Expose connection status for system tray
   > Completed: Created socket.ts with persistent device ID storage (custom SimpleStore class replacing electron-store v11 ESM-only package), os.hostname()/os.platform() device identification, WebSocket connection via socket.io-client, device:register emission, 30-second heartbeat interval, exponential backoff reconnection (1s to 30s max), message:receive event handler that triggers showNotification(), and exported connection status functions (getConnectionStatus, onStatusChange). Also updated main.ts to integrate socket connection on startup and expose device info via IPC handlers. TypeScript compiles successfully.
 
-- [ ] Create preload script in client/src/preload/preload.ts:
+- [x] Create preload script in client/src/preload/preload.ts:
   - Expose safe IPC bridge using contextBridge
   - exposeInMainWorld: receiveNotification callback, getDeviceInfo, clearNotification
   - Type definitions for exposed API
+  > Completed: Created preload.ts with contextBridge.exposeInMainWorld('creaBomber', ...) exposing: onNotification callback for receiving messages, onHide callback for hide events, closeNotification to dismiss, requestResize for dynamic sizing, getDeviceInfo/getConnectionStatus/getServerUrl async getters. Also created types.d.ts with full TypeScript type declarations including global Window interface augmentation for window.creaBomber. TypeScript compiles successfully.
 
 - [ ] Create notification renderer HTML/CSS in client/src/renderer/:
   - notification.html: minimal HTML shell loading notification.css and notification.js
