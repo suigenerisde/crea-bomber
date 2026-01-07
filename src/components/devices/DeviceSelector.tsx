@@ -2,7 +2,7 @@
 
 import { clsx } from 'clsx';
 import { Button } from '@/components/ui';
-import type { Device } from './DeviceCard';
+import type { Device } from '@/types';
 
 interface DeviceSelectorProps {
   devices: Device[];
@@ -17,7 +17,8 @@ export function DeviceSelector({
   onChange,
   className,
 }: DeviceSelectorProps) {
-  const onlineCount = devices.filter((device) => device.online).length;
+  const onlineDevices = devices.filter((device) => device.status === 'online');
+  const onlineCount = onlineDevices.length;
 
   const handleToggle = (deviceId: string) => {
     if (selectedIds.includes(deviceId)) {
@@ -28,9 +29,7 @@ export function DeviceSelector({
   };
 
   const handleSelectAll = () => {
-    const onlineDeviceIds = devices
-      .filter((device) => device.online)
-      .map((device) => device.id);
+    const onlineDeviceIds = onlineDevices.map((device) => device.id);
     onChange(onlineDeviceIds);
   };
 
@@ -67,7 +66,8 @@ export function DeviceSelector({
       <div className="space-y-1 max-h-64 overflow-y-auto">
         {devices.map((device) => {
           const isSelected = selectedIds.includes(device.id);
-          const isDisabled = !device.online;
+          const isOnline = device.status === 'online';
+          const isDisabled = !isOnline;
 
           return (
             <label
@@ -101,7 +101,7 @@ export function DeviceSelector({
               <span
                 className={clsx(
                   'w-2 h-2 rounded-full',
-                  device.online ? 'bg-green-500' : 'bg-slate-500'
+                  isOnline ? 'bg-green-500' : 'bg-slate-500'
                 )}
               />
             </label>

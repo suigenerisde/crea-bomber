@@ -7,27 +7,6 @@ import { PreviewModal } from '@/components/preview';
 import { DeviceSelector } from '@/components/devices';
 import { Card, Badge } from '@/components/ui';
 import { useSocket, useDevices, useMessages } from '@/hooks';
-import type { Device as TypedDevice } from '@/types';
-
-// Adapter type for DeviceSelector compatibility
-interface SelectorDevice {
-  id: string;
-  name: string;
-  hostname: string;
-  online: boolean;
-  lastSeen: Date;
-}
-
-// Convert typed Device to selector-compatible format
-function toSelectorDevice(device: TypedDevice): SelectorDevice {
-  return {
-    id: device.id,
-    name: device.name,
-    hostname: device.hostname,
-    online: device.status === 'online',
-    lastSeen: device.lastSeen,
-  };
-}
 
 export default function ComposePage() {
   const router = useRouter();
@@ -42,9 +21,6 @@ export default function ComposePage() {
   const { socket, status: socketStatus, isConnected } = useSocket();
   const { devices, loading: devicesLoading, error: devicesError } = useDevices({ socket });
   const { createMessage, creating } = useMessages({ socket, autoFetch: false });
-
-  // Convert devices for the selector component
-  const selectorDevices: SelectorDevice[] = devices.map(toSelectorDevice);
 
   const handlePreview = (data: MessageData) => {
     if (selectedDevices.length === 0) {
@@ -204,7 +180,7 @@ export default function ComposePage() {
               </div>
             ) : (
               <DeviceSelector
-                devices={selectorDevices}
+                devices={devices}
                 selectedIds={selectedDevices}
                 onChange={setSelectedDevices}
               />

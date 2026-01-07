@@ -3,33 +3,32 @@
 import { clsx } from 'clsx';
 import { formatDistanceToNow } from 'date-fns';
 import { Badge } from '@/components/ui';
-
-export interface Device {
-  id: string;
-  name: string;
-  hostname: string;
-  online: boolean;
-  lastSeen: Date | string;
-}
+import type { Device } from '@/types';
 
 interface DeviceCardProps {
   device: Device;
+  onClick?: () => void;
   className?: string;
 }
 
-export function DeviceCard({ device, className }: DeviceCardProps) {
-  const lastSeenDate = typeof device.lastSeen === 'string'
-    ? new Date(device.lastSeen)
-    : device.lastSeen;
+export function DeviceCard({ device, onClick, className }: DeviceCardProps) {
+  const lastSeenDate =
+    typeof device.lastSeen === 'string' ? new Date(device.lastSeen) : device.lastSeen;
 
   const lastSeenRelative = formatDistanceToNow(lastSeenDate, { addSuffix: true });
+  const isOnline = device.status === 'online';
+
+  const Component = onClick ? 'button' : 'div';
 
   return (
-    <div
+    <Component
+      type={onClick ? 'button' : undefined}
+      onClick={onClick}
       className={clsx(
-        'bg-slate-800 rounded-lg border border-slate-700 p-4',
+        'bg-slate-800 rounded-lg border border-slate-700 p-4 w-full text-left',
         'transition-all duration-200',
-        'hover:bg-slate-750 hover:border-slate-600',
+        onClick && 'cursor-pointer hover:bg-slate-750 hover:border-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-slate-900',
+        !onClick && 'hover:bg-slate-750 hover:border-slate-600',
         className
       )}
     >
@@ -38,13 +37,11 @@ export function DeviceCard({ device, className }: DeviceCardProps) {
           <h3 className="font-medium text-white truncate">{device.name}</h3>
           <p className="text-sm text-slate-400 truncate">{device.hostname}</p>
         </div>
-        <Badge variant={device.online ? 'success' : 'neutral'} size="sm">
-          {device.online ? 'Online' : 'Offline'}
+        <Badge variant={isOnline ? 'success' : 'neutral'} size="sm">
+          {isOnline ? 'Online' : 'Offline'}
         </Badge>
       </div>
-      <p className="mt-3 text-xs text-slate-500">
-        Last seen {lastSeenRelative}
-      </p>
-    </div>
+      <p className="mt-3 text-xs text-slate-500">Last seen {lastSeenRelative}</p>
+    </Component>
   );
 }

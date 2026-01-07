@@ -34,13 +34,14 @@ This phase completes the web dashboard by building out all pages, creating the R
   - Loading state during send
   ✅ Completed: Full Compose page with real-time device fetching via useSocket/useDevices hooks, createMessage integration via useMessages hook, toast notifications for success/error, loading overlay during send, validation requiring device selection, and automatic redirect to /history after successful send
 
-- [ ] Build the Devices page (src/app/devices/page.tsx):
+- [x] Build the Devices page (src/app/devices/page.tsx):
   - DeviceList component showing all registered devices
   - Filter tabs: All, Online Only, Offline Only
   - Each DeviceCard shows: name, hostname, status, last seen
   - Click on device shows detail modal with full info and option to remove
   - "Refresh" button to manually fetch latest status
   - Empty state when no devices registered
+  ✅ Completed: Full Devices page with filter tabs (All/Online/Offline with counts), DeviceDetailModal with remove confirmation, Refresh button with loading state, real-time socket connection indicator, error handling, and empty states. Also fixed DeviceCard/DeviceSelector/DeviceList to use proper Device type from @/types (status field instead of online boolean).
 
 - [ ] Build the History page (src/app/history/page.tsx):
   - MessageHistoryList component with paginated messages

@@ -1,49 +1,73 @@
 'use client';
 
-import { useState } from 'react';
 import { clsx } from 'clsx';
-import { DeviceCard, type Device } from './DeviceCard';
-import { Toggle } from '@/components/ui';
+import { DeviceCard } from './DeviceCard';
+import type { Device } from '@/types';
+
+type FilterTab = 'all' | 'online' | 'offline';
 
 interface DeviceListProps {
   devices: Device[];
+  activeFilter: FilterTab;
+  onDeviceClick?: (device: Device) => void;
   className?: string;
 }
 
-export function DeviceList({ devices, className }: DeviceListProps) {
-  const [showOnlineOnly, setShowOnlineOnly] = useState(false);
+export function DeviceList({
+  devices,
+  activeFilter,
+  onDeviceClick,
+  className,
+}: DeviceListProps) {
+  // Filter devices based on active tab
+  const filteredDevices =
+    activeFilter === 'all'
+      ? devices
+      : devices.filter((device) =>
+          activeFilter === 'online'
+            ? device.status === 'online'
+            : device.status === 'offline'
+        );
 
-  const filteredDevices = showOnlineOnly
-    ? devices.filter((device) => device.online)
-    : devices;
-
-  const onlineCount = devices.filter((device) => device.online).length;
+  const onlineCount = devices.filter((d) => d.status === 'online').length;
+  const offlineCount = devices.filter((d) => d.status === 'offline').length;
 
   return (
     <div className={clsx('space-y-4', className)}>
-      <div className="flex items-center justify-between">
-        <p className="text-sm text-slate-400">
-          {onlineCount} of {devices.length} devices online
-        </p>
-        <Toggle
-          checked={showOnlineOnly}
-          onChange={setShowOnlineOnly}
-          label="Online only"
-        />
-      </div>
+      <p className="text-sm text-slate-400">
+        {activeFilter === 'all'
+          ? `${devices.length} device${devices.length !== 1 ? 's' : ''} total • ${onlineCount} online`
+          : activeFilter === 'online'
+            ? `${onlineCount} device${onlineCount !== 1 ? 's' : ''} online`
+            : `${offlineCount} device${offlineCount !== 1 ? 's' : ''} offline`}
+      </p>
 
       {filteredDevices.length === 0 ? (
         <div className="text-center py-12">
+          <div className="text-4xl mb-3">
+            {activeFilter === 'online' ? '🔌' : activeFilter === 'offline' ? '✅' : '📱'}
+          </div>
           <p className="text-slate-400">
-            {showOnlineOnly
+            {activeFilter === 'online'
               ? 'No devices are currently online'
-              : 'No devices registered yet'}
+              : activeFilter === 'offline'
+                ? 'All devices are online!'
+                : 'No devices registered yet'}
           </p>
+          {activeFilter === 'all' && (
+            <p className="text-slate-500 text-sm mt-1">
+              Devices will appear here once they connect
+            </p>
+          )}
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredDevices.map((device) => (
-            <DeviceCard key={device.id} device={device} />
+            <DeviceCard
+              key={device.id}
+              device={device}
+              onClick={onDeviceClick ? () => onDeviceClick(device) : undefined}
+            />
           ))}
         </div>
       )}
