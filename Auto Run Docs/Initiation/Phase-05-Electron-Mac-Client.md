@@ -23,7 +23,7 @@ This phase creates the macOS client application that runs on target devices. The
   - Handle multiple notifications: queue system or stack
   > Completed: Created main.ts with frameless transparent BrowserWindow, positioned top-right. Implements notification queue system, auto-dismiss timeouts by message type (TEXT: 8s, IMAGE: 12s, VIDEO: 15s, AUDIO: 10s), IPC handlers for renderer communication, and dynamic window resizing. TypeScript compiles successfully.
 
-- [ ] Create device registration and WebSocket connection in client/src/main/socket.ts:
+- [x] Create device registration and WebSocket connection in client/src/main/socket.ts:
   - Generate or load persistent device ID using electron-store
   - Get device name from os.hostname() and os.platform()
   - Connect to dashboard WebSocket server on startup
@@ -32,6 +32,7 @@ This phase creates the macOS client application that runs on target devices. The
   - Handle reconnection on disconnect with exponential backoff
   - Listen for 'message:receive' events, trigger notification display
   - Expose connection status for system tray
+  > Completed: Created socket.ts with persistent device ID storage (custom SimpleStore class replacing electron-store v11 ESM-only package), os.hostname()/os.platform() device identification, WebSocket connection via socket.io-client, device:register emission, 30-second heartbeat interval, exponential backoff reconnection (1s to 30s max), message:receive event handler that triggers showNotification(), and exported connection status functions (getConnectionStatus, onStatusChange). Also updated main.ts to integrate socket connection on startup and expose device info via IPC handlers. TypeScript compiles successfully.
 
 - [ ] Create preload script in client/src/preload/preload.ts:
   - Expose safe IPC bridge using contextBridge

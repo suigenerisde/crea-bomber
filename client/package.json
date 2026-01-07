@@ -25,7 +25,6 @@
     "typescript": "^5.9.3"
   },
   "dependencies": {
-    "electron-store": "^11.0.2",
     "socket.io-client": "^4.8.3",
     "uuid": "^13.0.0"
   },

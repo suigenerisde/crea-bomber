@@ -5,6 +5,7 @@
 
 import { app, BrowserWindow, screen, ipcMain } from 'electron';
 import * as path from 'path';
+import { connect, getDeviceInfo, getConnectionStatus, getServerUrl } from './socket';
 
 // Notification window configuration
 const NOTIFICATION_WIDTH = 400;
@@ -236,12 +237,24 @@ function setupIPCHandlers(): void {
 
   // Get device info for renderer
   ipcMain.handle('device:getInfo', () => {
-    // This will be populated by socket.ts
+    const deviceInfo = getDeviceInfo();
     return {
-      id: '',
-      name: '',
-      hostname: '',
+      id: deviceInfo.id,
+      name: deviceInfo.name,
+      hostname: deviceInfo.hostname,
+      platform: deviceInfo.platform,
+      connected: deviceInfo.connected,
     };
+  });
+
+  // Get connection status for renderer
+  ipcMain.handle('connection:getStatus', () => {
+    return getConnectionStatus();
+  });
+
+  // Get server URL for renderer
+  ipcMain.handle('connection:getServerUrl', () => {
+    return getServerUrl();
   });
 }
 
@@ -256,6 +269,9 @@ async function initialize(): Promise<void> {
 
   // Create notification window
   notificationWindow = createNotificationWindow();
+
+  // Connect to dashboard WebSocket server
+  connect();
 
   console.log('[Main] CreaBomber client initialized');
 }
