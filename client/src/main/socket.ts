@@ -30,10 +30,38 @@ function safeLog(...args: unknown[]): void {
 }
 
 // Configuration
-// Priority: SERVER_URL env > development mode > production default
+// Priority: bundled config > env var > development mode > production default
+
+// Try to load bundled device config (for pre-configured family clients)
+interface BundledConfig {
+  deviceId?: string;
+  deviceName?: string;
+  serverUrl?: string;
+}
+
+function loadBundledConfig(): BundledConfig {
+  try {
+    // In production, resources are in app.asar/../ or process.resourcesPath
+    const resourcesPath = process.resourcesPath || path.dirname(app.getAppPath());
+    const configPath = path.join(resourcesPath, 'device-config.json');
+
+    if (fs.existsSync(configPath)) {
+      const configData = fs.readFileSync(configPath, 'utf-8');
+      const config = JSON.parse(configData) as BundledConfig;
+      console.log('[Socket] Loaded bundled device config:', config.deviceName || 'unnamed');
+      return config;
+    }
+  } catch (error) {
+    console.log('[Socket] No bundled config found, using defaults');
+  }
+  return {};
+}
+
+const bundledConfig = loadBundledConfig();
+
 // Production: VPS server at bomber.suimation.de
 // Development: localhost:3000
-const DEFAULT_SERVER_URL = process.env.SERVER_URL || (
+const DEFAULT_SERVER_URL = bundledConfig.serverUrl || process.env.SERVER_URL || (
   process.env.NODE_ENV === 'development'
     ? 'http://localhost:3000'
     : 'https://bomber.suimation.de'
@@ -42,10 +70,10 @@ const HEARTBEAT_INTERVAL = 30000; // 30 seconds
 const INITIAL_RECONNECT_DELAY = 1000; // 1 second
 const MAX_RECONNECT_DELAY = 30000; // 30 seconds
 
-// Pre-configured device settings (set via environment variables at build time)
+// Pre-configured device settings (from bundled config or environment variables)
 // If these are set, the client is considered "pre-configured" and won't show settings
-const PRECONFIGURED_DEVICE_ID = process.env.DEVICE_ID || '';
-const PRECONFIGURED_DEVICE_NAME = process.env.DEVICE_NAME || '';
+const PRECONFIGURED_DEVICE_ID = bundledConfig.deviceId || process.env.DEVICE_ID || '';
+const PRECONFIGURED_DEVICE_NAME = bundledConfig.deviceName || process.env.DEVICE_NAME || '';
 
 /**
  * Check if this client is pre-configured (has hardcoded device ID/name)
@@ -273,10 +301,15 @@ function setConnectionStatus(status: ConnectionStatus): void {
 }
 
 /**
- * Get the server URL (env var takes priority over store)
+ * Get the server URL
+ * Priority: bundled config > env var > store
  */
 export function getServerUrl(): string {
-  // Environment variable always takes priority (for pre-configured clients)
+  // Bundled config takes priority for pre-configured clients
+  if (bundledConfig.serverUrl) {
+    return bundledConfig.serverUrl;
+  }
+  // Environment variable next
   if (process.env.SERVER_URL) {
     return process.env.SERVER_URL;
   }

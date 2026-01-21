@@ -483,6 +483,12 @@ async function checkScheduledMessages(): Promise<void> {
 async function initialize(): Promise<void> {
   console.log('[Main] Initializing CreaBomber client...');
 
+  // Hide dock icon for pre-configured clients (tray-only mode)
+  if (process.platform === 'darwin' && isPreconfigured() && app.dock) {
+    app.dock.hide();
+    console.log('[Main] Dock icon hidden (pre-configured client)');
+  }
+
   // Setup IPC handlers
   setupIPCHandlers();
 
