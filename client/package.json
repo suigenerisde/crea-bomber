@@ -69,6 +69,10 @@
       {
         "from": "src/renderer",
         "to": "renderer"
+      },
+      {
+        "from": "device-config.json",
+        "to": "device-config.json"
       }
     ]
   }
