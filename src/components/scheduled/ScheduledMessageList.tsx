@@ -105,7 +105,7 @@ function MessageCard({ message, onEdit, onDelete, isUpcoming }: MessageCardProps
           {new Date(message.date).toLocaleDateString('de-DE', { month: 'short' })}
         </div>
         {message.recurring && (
-          <Repeat className="w-3 h-3 text-blue-400 mx-auto mt-1" title="Jaehrlich" />
+          <Repeat className="w-3 h-3 text-blue-400 mx-auto mt-1" />
         )}
       </div>
 
