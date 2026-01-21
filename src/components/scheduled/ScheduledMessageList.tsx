@@ -113,7 +113,7 @@ function MessageCard({ message, onEdit, onDelete, isUpcoming }: MessageCardProps
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 mb-1">
           <span className="text-lg">{getTypeIcon(message.type)}</span>
-          <Badge variant={isUpcoming ? 'primary' : 'neutral'} size="sm">
+          <Badge variant={isUpcoming ? 'info' : 'neutral'} size="sm">
             {getTypeLabel(message.type)}
           </Badge>
           {message.recurring && (
