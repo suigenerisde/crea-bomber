@@ -63,9 +63,9 @@ USER creabomber
 # Expose port
 EXPOSE 3000
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:3000/api/health || exit 1
+# Health check (use 127.0.0.1 to force IPv4, server binds to 0.0.0.0)
+HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=5 \
+  CMD wget --no-verbose --tries=1 --spider http://127.0.0.1:3000/api/health || exit 1
 
 # Start with PM2
 CMD ["pm2-runtime", "ecosystem.config.js", "--env", "production"]
