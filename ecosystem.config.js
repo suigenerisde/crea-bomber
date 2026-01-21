@@ -16,6 +16,9 @@
  *   5. Setup startup: pm2 startup (follow instructions)
  */
 
+// Detect production environment for Docker
+const isProduction = process.env.NODE_ENV === 'production';
+
 module.exports = {
   apps: [
     {
@@ -25,9 +28,9 @@ module.exports = {
       // Entry point script
       script: 'server.ts',
 
-      // Use ts-node to run TypeScript directly
-      interpreter: 'node_modules/.bin/ts-node',
-      interpreter_args: '--project tsconfig.server.json -r tsconfig-paths/register',
+      // Use tsx in production (installed globally), ts-node in development
+      interpreter: isProduction ? 'tsx' : 'node_modules/.bin/ts-node',
+      interpreter_args: isProduction ? '' : '--project tsconfig.server.json -r tsconfig-paths/register',
 
       // Working directory
       cwd: __dirname,

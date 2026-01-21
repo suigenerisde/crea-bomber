@@ -32,8 +32,8 @@ WORKDIR /app
 # Install runtime dependencies for better-sqlite3
 RUN apk add --no-cache python3 make g++
 
-# Install PM2 globally
-RUN npm install -g pm2
+# Install PM2 and tsx (TypeScript executor) globally
+RUN npm install -g pm2 tsx
 
 # Create non-root user for security
 RUN addgroup --system --gid 1001 nodejs
