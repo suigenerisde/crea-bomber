@@ -1,0 +1,53 @@
+# CreaBomber Docker Compose Configuration
+# For deployment with Coolify or standalone Docker
+
+services:
+  creabomber:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: creabomber
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - HOSTNAME=0.0.0.0
+      - DATABASE_PATH=/app/data/creabomber.db
+      # CORS (allows Electron clients from any origin)
+      - CORS_ORIGINS=https://bomber.suimation.de,http://localhost:3000,http://127.0.0.1:3000
+      # Supabase (for Scheduled Messages)
+      - NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL:-https://supabase-new.suimation.de}
+      - NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+      - SUPABASE_URL=${SUPABASE_URL:-https://supabase-new.suimation.de}
+      - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
+    volumes:
+      # Persistent data volume for SQLite database
+      - creabomber-data:/app/data
+      # Logs volume (optional)
+      - creabomber-logs:/app/logs
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    labels:
+      # Coolify labels (auto-configured by Coolify, but listed for reference)
+      - "coolify.managed=true"
+      # Traefik labels (if using Traefik reverse proxy)
+      - "traefik.enable=true"
+      - "traefik.http.routers.creabomber.rule=Host(`bomber.suimation.de`)"
+      - "traefik.http.routers.creabomber.entrypoints=websecure"
+      - "traefik.http.routers.creabomber.tls.certresolver=letsencrypt"
+      - "traefik.http.services.creabomber.loadbalancer.server.port=3000"
+      # WebSocket support
+      - "traefik.http.middlewares.creabomber-headers.headers.customrequestheaders.Connection=Upgrade"
+      - "traefik.http.middlewares.creabomber-headers.headers.customrequestheaders.Upgrade=websocket"
+
+volumes:
+  creabomber-data:
+    name: creabomber-data
+  creabomber-logs:
+    name: creabomber-logs

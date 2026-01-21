@@ -1,10 +1,306 @@
 /**
  * CreaBomber Notification Renderer
  * Handles notification display, interactions, and media content
+ * with preloading and embedded video support
  */
 
-// DOM Elements
+// ============================================================
+// MEDIA PRELOADER CLASS
+// ============================================================
+
+/**
+ * MediaPreloader - Preloads all media assets before showing notification
+ * Supports images, video thumbnails, and audio files
+ */
+class MediaPreloader {
+  constructor(options = {}) {
+    this.timeout = options.timeout || 10000; // 10 second max wait
+    this.preloadedAssets = new Map();
+  }
+
+  /**
+   * Preload an image
+   */
+  preloadImage(url) {
+    return new Promise((resolve, reject) => {
+      if (!url) {
+        resolve(null);
+        return;
+      }
+
+      // Check cache
+      if (this.preloadedAssets.has(url)) {
+        resolve(this.preloadedAssets.get(url));
+        return;
+      }
+
+      const img = new Image();
+      img.onload = () => {
+        this.preloadedAssets.set(url, img);
+        resolve(img);
+      };
+      img.onerror = () => reject(new Error(`Failed to load image: ${url}`));
+      img.src = url;
+    });
+  }
+
+  /**
+   * Preload audio (just metadata, not full file)
+   */
+  preloadAudio(url) {
+    return new Promise((resolve, reject) => {
+      if (!url) {
+        resolve(null);
+        return;
+      }
+
+      const audio = new Audio();
+      audio.preload = 'metadata';
+
+      audio.onloadedmetadata = () => {
+        this.preloadedAssets.set(url, audio);
+        resolve(audio);
+      };
+      audio.onerror = () => reject(new Error(`Failed to load audio: ${url}`));
+      audio.src = url;
+    });
+  }
+
+  /**
+   * Preconnect to video embed domains for faster iframe loading
+   */
+  preconnectVideoHost(videoUrl) {
+    const hosts = [];
+
+    if (videoUrl.includes('youtube.com') || videoUrl.includes('youtu.be')) {
+      hosts.push('https://www.youtube.com', 'https://www.youtube-nocookie.com', 'https://i.ytimg.com');
+    } else if (videoUrl.includes('loom.com')) {
+      hosts.push('https://www.loom.com', 'https://cdn.loom.com');
+    } else if (videoUrl.includes('vimeo.com')) {
+      hosts.push('https://player.vimeo.com', 'https://i.vimeocdn.com');
+    }
+
+    hosts.forEach(host => {
+      const link = document.createElement('link');
+      link.rel = 'preconnect';
+      link.href = host;
+      document.head.appendChild(link);
+    });
+
+    return Promise.resolve();
+  }
+
+  /**
+   * Preload all assets for a payload
+   */
+  async preloadAll(payload) {
+    const tasks = [];
+
+    switch (payload.type) {
+      case 'TEXT_IMAGE':
+        if (payload.imageUrl) {
+          tasks.push(this.preloadImage(payload.imageUrl).catch(() => null));
+        }
+        break;
+
+      case 'VIDEO':
+        if (payload.videoUrl) {
+          // Preconnect to video host
+          tasks.push(this.preconnectVideoHost(payload.videoUrl));
+          // Also preload thumbnail
+          const thumbUrl = getThumbnailUrl(payload.videoUrl);
+          if (thumbUrl) {
+            tasks.push(this.preloadImage(thumbUrl).catch(() => null));
+          }
+        }
+        break;
+
+      case 'AUDIO':
+        if (payload.audioUrl) {
+          tasks.push(this.preloadAudio(payload.audioUrl).catch(() => null));
+        }
+        break;
+    }
+
+    // Wait for all with timeout
+    return Promise.race([
+      Promise.all(tasks),
+      new Promise(resolve => setTimeout(() => resolve([]), this.timeout))
+    ]);
+  }
+
+  /**
+   * Get preloaded asset
+   */
+  getAsset(url) {
+    return this.preloadedAssets.get(url);
+  }
+
+  /**
+   * Clear cache
+   */
+  clear() {
+    this.preloadedAssets.clear();
+  }
+}
+
+// ============================================================
+// VIDEO EMBEDDER CLASS
+// ============================================================
+
+/**
+ * VideoEmbedder - Creates embedded video players for YouTube, Loom, Vimeo
+ */
+class VideoEmbedder {
+  constructor(options = {}) {
+    this.autoplay = options.autoplay || false;
+    this.muted = options.muted !== false; // Default muted for autoplay
+  }
+
+  /**
+   * Get YouTube video ID from URL
+   */
+  getYouTubeId(url) {
+    if (!url) return null;
+    const patterns = [
+      /(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\s]+)/,
+      /youtube\.com\/embed\/([^?\s]+)/,
+      /youtube\.com\/v\/([^?\s]+)/
+    ];
+    for (const pattern of patterns) {
+      const match = url.match(pattern);
+      if (match) return match[1];
+    }
+    return null;
+  }
+
+  /**
+   * Get Loom video ID from URL
+   */
+  getLoomId(url) {
+    if (!url) return null;
+    const match = url.match(/loom\.com\/share\/([a-zA-Z0-9]+)/);
+    return match ? match[1] : null;
+  }
+
+  /**
+   * Get Vimeo video ID from URL
+   */
+  getVimeoId(url) {
+    if (!url) return null;
+    const match = url.match(/vimeo\.com\/(\d+)/);
+    return match ? match[1] : null;
+  }
+
+  /**
+   * Detect video platform
+   */
+  detectPlatform(url) {
+    if (this.getYouTubeId(url)) return 'youtube';
+    if (this.getLoomId(url)) return 'loom';
+    if (this.getVimeoId(url)) return 'vimeo';
+    return 'unknown';
+  }
+
+  /**
+   * Create YouTube embed iframe
+   */
+  createYouTubeEmbed(videoId, autoplay = false) {
+    const params = new URLSearchParams({
+      autoplay: autoplay ? '1' : '0',
+      mute: this.muted ? '1' : '0',
+      rel: '0',
+      modestbranding: '1',
+      playsinline: '1'
+    });
+
+    const iframe = document.createElement('iframe');
+    iframe.src = `https://www.youtube-nocookie.com/embed/${videoId}?${params}`;
+    iframe.width = '100%';
+    iframe.height = '100%';
+    iframe.frameBorder = '0';
+    iframe.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture';
+    iframe.allowFullscreen = true;
+
+    return iframe;
+  }
+
+  /**
+   * Create Loom embed iframe
+   */
+  createLoomEmbed(videoId, autoplay = false) {
+    const params = new URLSearchParams({
+      hide_owner: 'true',
+      hide_share: 'true',
+      hide_title: 'true'
+    });
+
+    const iframe = document.createElement('iframe');
+    iframe.src = `https://www.loom.com/embed/${videoId}?${params}`;
+    iframe.width = '100%';
+    iframe.height = '100%';
+    iframe.frameBorder = '0';
+    iframe.allow = 'autoplay; fullscreen';
+    iframe.allowFullscreen = true;
+
+    return iframe;
+  }
+
+  /**
+   * Create Vimeo embed iframe
+   */
+  createVimeoEmbed(videoId, autoplay = false) {
+    const params = new URLSearchParams({
+      autoplay: autoplay ? '1' : '0',
+      muted: this.muted ? '1' : '0',
+      title: '0',
+      byline: '0',
+      portrait: '0'
+    });
+
+    const iframe = document.createElement('iframe');
+    iframe.src = `https://player.vimeo.com/video/${videoId}?${params}`;
+    iframe.width = '100%';
+    iframe.height = '100%';
+    iframe.frameBorder = '0';
+    iframe.allow = 'autoplay; fullscreen; picture-in-picture';
+    iframe.allowFullscreen = true;
+
+    return iframe;
+  }
+
+  /**
+   * Create embedded video element
+   */
+  createEmbed(url, autoplay = false) {
+    const platform = this.detectPlatform(url);
+
+    switch (platform) {
+      case 'youtube':
+        return this.createYouTubeEmbed(this.getYouTubeId(url), autoplay);
+      case 'loom':
+        return this.createLoomEmbed(this.getLoomId(url), autoplay);
+      case 'vimeo':
+        return this.createVimeoEmbed(this.getVimeoId(url), autoplay);
+      default:
+        return null;
+    }
+  }
+
+  /**
+   * Check if URL can be embedded
+   */
+  canEmbed(url) {
+    return this.detectPlatform(url) !== 'unknown';
+  }
+}
+
+// ============================================================
+// DOM ELEMENTS
+// ============================================================
+
 const notification = document.getElementById('notification');
+const preloadOverlay = document.getElementById('preload-overlay');
 const textContent = document.getElementById('text-content');
 const imageContainer = document.getElementById('image-container');
 const imageLoading = document.getElementById('image-loading');
@@ -12,6 +308,7 @@ const imageContent = document.getElementById('image-content');
 const videoContainer = document.getElementById('video-container');
 const videoThumbnail = document.getElementById('video-thumbnail');
 const videoThumbImg = document.getElementById('video-thumb-img');
+const videoEmbedContainer = document.getElementById('video-embed-container');
 const audioContainer = document.getElementById('audio-container');
 const audioWaveform = document.getElementById('audio-waveform');
 const audioAutoplayBadge = document.getElementById('audio-autoplay-badge');
@@ -20,11 +317,26 @@ const timestamp = document.getElementById('timestamp');
 const closeBtn = document.getElementById('close-btn');
 const progressBar = document.getElementById('progress-bar');
 
-// State
+// ============================================================
+// INSTANCES
+// ============================================================
+
+const mediaPreloader = new MediaPreloader({ timeout: 10000 });
+const videoEmbedder = new VideoEmbedder({ muted: true });
+
+// ============================================================
+// STATE
+// ============================================================
+
 let currentPayload = null;
 let progressInterval = null;
 let startTime = null;
 let duration = 0;
+let isVideoEmbedded = false;
+
+// ============================================================
+// UTILITY FUNCTIONS
+// ============================================================
 
 /**
  * Format timestamp to "h:mm a" format
@@ -75,12 +387,14 @@ function getVimeoVideoId(url) {
 
 /**
  * Get video thumbnail URL
+ * Uses high-quality thumbnail for YouTube (maxresdefault with fallback to hqdefault)
  */
 function getThumbnailUrl(videoUrl) {
-  // YouTube
+  // YouTube - use maxresdefault for high quality
   const youtubeId = getYouTubeVideoId(videoUrl);
   if (youtubeId) {
-    return `https://img.youtube.com/vi/${youtubeId}/hqdefault.jpg`;
+    // maxresdefault gives 1280x720, hqdefault gives 480x360
+    return `https://img.youtube.com/vi/${youtubeId}/maxresdefault.jpg`;
   }
 
   // Loom - use placeholder since Loom thumbnails require API
@@ -92,10 +406,20 @@ function getThumbnailUrl(videoUrl) {
   // Vimeo - use placeholder since Vimeo thumbnails require API
   const vimeoId = getVimeoVideoId(videoUrl);
   if (vimeoId) {
-    // Vimeo doesn't have a direct thumbnail URL pattern, return null for placeholder
     return null;
   }
 
+  return null;
+}
+
+/**
+ * Get fallback thumbnail URL (lower quality)
+ */
+function getFallbackThumbnailUrl(videoUrl) {
+  const youtubeId = getYouTubeVideoId(videoUrl);
+  if (youtubeId) {
+    return `https://img.youtube.com/vi/${youtubeId}/hqdefault.jpg`;
+  }
   return null;
 }
 
@@ -104,7 +428,6 @@ function getThumbnailUrl(videoUrl) {
  */
 function openVideoUrl(url) {
   if (url) {
-    // Use shell.openExternal if available via preload, otherwise window.open
     window.open(url, '_blank');
   }
 }
@@ -119,7 +442,6 @@ function generateWaveform() {
   for (let i = 0; i < barCount; i++) {
     const bar = document.createElement('div');
     bar.className = 'audio-bar';
-    // Random height for visual interest
     const height = Math.random() * 100;
     bar.style.height = `${Math.max(height, 15)}%`;
     audioWaveform.appendChild(bar);
@@ -133,12 +455,10 @@ function startProgress(totalDuration) {
   duration = totalDuration;
   startTime = Date.now();
 
-  // Clear any existing interval
   if (progressInterval) {
     clearInterval(progressInterval);
   }
 
-  // Update progress every 100ms
   progressInterval = setInterval(() => {
     const elapsed = Date.now() - startTime;
     const remaining = Math.max(0, duration - elapsed);
@@ -164,6 +484,53 @@ function stopProgress() {
 }
 
 /**
+ * Render text with proper line breaks
+ */
+function renderText(text) {
+  if (!text) return '';
+  const escaped = text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+  return escaped.replace(/\n/g, '<br>');
+}
+
+/**
+ * Create video placeholder SVG
+ */
+function createVideoPlaceholder(text = 'Video') {
+  const svg = `<svg width="320" height="128" xmlns="http://www.w3.org/2000/svg">
+    <rect width="100%" height="100%" fill="#1e293b"/>
+    <circle cx="160" cy="55" r="24" fill="rgba(59, 130, 246, 0.2)"/>
+    <polygon points="155,45 155,65 170,55" fill="#60a5fa"/>
+    <text x="50%" y="100" dominant-baseline="middle" text-anchor="middle" fill="#94a3b8" font-family="sans-serif" font-size="12">${text}</text>
+  </svg>`;
+  return `data:image/svg+xml;base64,${btoa(svg)}`;
+}
+
+// ============================================================
+// PRELOAD OVERLAY
+// ============================================================
+
+function showPreloadOverlay() {
+  if (preloadOverlay) {
+    preloadOverlay.classList.remove('hidden');
+  }
+}
+
+function hidePreloadOverlay() {
+  if (preloadOverlay) {
+    preloadOverlay.classList.add('hidden');
+  }
+}
+
+// ============================================================
+// RESET FUNCTIONS
+// ============================================================
+
+/**
  * Reset all content areas
  */
 function resetContent() {
@@ -171,11 +538,12 @@ function resetContent() {
   imageContainer.classList.add('hidden');
   videoContainer.classList.add('hidden');
   audioContainer.classList.add('hidden');
+  hidePreloadOverlay();
 
   // Reset text
   textContent.innerHTML = '';
 
-  // Reset image - restore original structure if it was replaced by error
+  // Reset image
   if (!imageContainer.querySelector('.notification-image')) {
     imageContainer.innerHTML = `
       <div id="image-loading" class="loading-indicator">
@@ -183,7 +551,6 @@ function resetContent() {
       </div>
       <img id="image-content" class="notification-image" alt="Notification image">
     `;
-    // Re-acquire references
     window.imageLoading = document.getElementById('image-loading');
     window.imageContent = document.getElementById('image-content');
   }
@@ -192,11 +559,17 @@ function resetContent() {
   imageContent.classList.add('loading');
   imageLoading.classList.remove('hidden');
 
-  // Reset video
+  // Reset video - clear embed if exists
+  if (videoEmbedContainer) {
+    videoEmbedContainer.innerHTML = '';
+    videoEmbedContainer.classList.add('hidden');
+  }
+  videoThumbnail.classList.remove('hidden');
   videoThumbImg.src = '';
   videoThumbImg.classList.remove('loading');
+  isVideoEmbedded = false;
 
-  // Reset audio - clean up event handlers and state
+  // Reset audio
   audioPlayer.pause();
   audioPlayer.src = '';
   audioPlayer.oncanplaythrough = null;
@@ -206,13 +579,11 @@ function resetContent() {
   audioPlayer.onended = null;
   audioAutoplayBadge.classList.add('hidden');
 
-  // Reset audio label
   const audioLabel = audioContainer.querySelector('.audio-label');
   if (audioLabel) {
     audioLabel.textContent = 'Audio message';
   }
 
-  // Reset audio icon styles (in case of error state)
   const audioIcon = audioContainer.querySelector('.audio-icon');
   if (audioIcon) {
     audioIcon.style.background = '';
@@ -220,7 +591,6 @@ function resetContent() {
     if (svg) svg.style.color = '';
   }
 
-  // Reset waveform bar styles
   const bars = audioWaveform.querySelectorAll('.audio-bar');
   bars.forEach(bar => {
     bar.style.background = '';
@@ -234,30 +604,20 @@ function resetContent() {
   stopProgress();
   progressBar.style.transform = 'scaleX(1)';
 
+  // Clear preloader cache
+  mediaPreloader.clear();
+
   currentPayload = null;
 }
 
-/**
- * Render text with proper line breaks
- * Converts \n to <br> while escaping HTML
- */
-function renderText(text) {
-  if (!text) return '';
-  // Escape HTML entities to prevent XSS
-  const escaped = text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;');
-  // Convert line breaks to <br> tags
-  return escaped.replace(/\n/g, '<br>');
-}
+// ============================================================
+// SHOW NOTIFICATION
+// ============================================================
 
 /**
- * Show notification with payload
+ * Show notification with payload (with preloading)
  */
-function showNotification(payload) {
+async function showNotification(payload) {
   console.log('[Renderer] Showing notification:', payload);
 
   // Reset previous content
@@ -266,10 +626,26 @@ function showNotification(payload) {
   // Store current payload
   currentPayload = payload;
 
+  // Show preload overlay for media types
+  if (payload.type !== 'TEXT') {
+    showPreloadOverlay();
+  }
+
+  // Preload all assets
+  try {
+    await mediaPreloader.preloadAll(payload);
+    console.log('[Renderer] Media preloaded successfully');
+  } catch (err) {
+    console.warn('[Renderer] Preload failed:', err);
+  }
+
+  // Hide preload overlay
+  hidePreloadOverlay();
+
   // Set timestamp
   timestamp.textContent = formatTime(new Date());
 
-  // Set text content with proper line break support
+  // Set text content
   if (payload.content) {
     textContent.innerHTML = renderText(payload.content);
   } else {
@@ -279,7 +655,6 @@ function showNotification(payload) {
   // Handle different message types
   switch (payload.type) {
     case 'TEXT':
-      // Text only - nothing extra to show
       break;
 
     case 'TEXT_IMAGE':
@@ -290,7 +665,7 @@ function showNotification(payload) {
 
     case 'VIDEO':
       if (payload.videoUrl) {
-        showVideo(payload.videoUrl);
+        showVideo(payload.videoUrl, payload.videoAutoplay);
       }
       break;
 
@@ -301,26 +676,18 @@ function showNotification(payload) {
       break;
   }
 
-  // Calculate duration based on type
-  const durations = {
-    'TEXT': 8000,
-    'TEXT_IMAGE': 12000,
-    'VIDEO': 15000,
-    'AUDIO': 10000
-  };
-  const displayDuration = durations[payload.type] || 8000;
-
-  // Start progress bar
-  startProgress(displayDuration);
-
   // Show notification with animation
   notification.classList.remove('hidden', 'hiding');
-  // Force reflow for animation
   void notification.offsetWidth;
   notification.classList.add('visible', 'animate-in');
 
   // Request appropriate window size
   requestWindowResize(payload.type);
+
+  // Signal main process that preload is complete and window can be shown
+  if (window.creaBomber && window.creaBomber.notifyPreloadComplete) {
+    window.creaBomber.notifyPreloadComplete();
+  }
 }
 
 /**
@@ -332,7 +699,6 @@ function hideNotification() {
   notification.classList.remove('visible', 'animate-in');
   notification.classList.add('hiding');
 
-  // After animation, reset
   setTimeout(() => {
     notification.classList.add('hidden');
     notification.classList.remove('hiding');
@@ -340,28 +706,40 @@ function hideNotification() {
   }, 300);
 }
 
+// ============================================================
+// CONTENT DISPLAY FUNCTIONS
+// ============================================================
+
 /**
- * Show image content with loading state and max dimensions
+ * Show image content
  */
 function showImage(imageUrl) {
   imageContainer.classList.remove('hidden');
 
-  // Show loading state
-  imageLoading.classList.remove('hidden');
-  imageContent.classList.add('loading');
-  imageContent.classList.remove('loaded');
+  // Check if preloaded
+  const preloadedImg = mediaPreloader.getAsset(imageUrl);
 
-  // Create a new image to preload and check dimensions
-  const tempImg = new Image();
-
-  tempImg.onload = () => {
-    // Image loaded successfully - update the display
+  if (preloadedImg) {
     imageLoading.classList.add('hidden');
     imageContent.src = imageUrl;
     imageContent.classList.remove('loading');
     imageContent.classList.add('loaded');
+    console.log('[Renderer] Using preloaded image');
+    return;
+  }
 
-    console.log('[Renderer] Image loaded:', tempImg.naturalWidth, 'x', tempImg.naturalHeight);
+  // Fallback to loading
+  imageLoading.classList.remove('hidden');
+  imageContent.classList.add('loading');
+  imageContent.classList.remove('loaded');
+
+  const tempImg = new Image();
+
+  tempImg.onload = () => {
+    imageLoading.classList.add('hidden');
+    imageContent.src = imageUrl;
+    imageContent.classList.remove('loading');
+    imageContent.classList.add('loaded');
   };
 
   tempImg.onerror = () => {
@@ -369,7 +747,6 @@ function showImage(imageUrl) {
     imageLoading.classList.add('hidden');
     imageContent.classList.remove('loading');
 
-    // Show error state with icon
     imageContainer.innerHTML = `
       <div class="notification-error">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -382,109 +759,148 @@ function showImage(imageUrl) {
     `;
   };
 
-  // Start loading the image
   tempImg.src = imageUrl;
 }
 
 /**
- * Create video placeholder SVG with custom text
+ * Show video content with embedded player or thumbnail
+ * For YouTube: Shows thumbnail, then embeds with muted autoplay on click or immediately if autoplay=true
  */
-function createVideoPlaceholder(text = 'Video') {
-  const svg = `<svg width="320" height="128" xmlns="http://www.w3.org/2000/svg">
-    <rect width="100%" height="100%" fill="#1e293b"/>
-    <circle cx="160" cy="55" r="24" fill="rgba(59, 130, 246, 0.2)"/>
-    <polygon points="155,45 155,65 170,55" fill="#60a5fa"/>
-    <text x="50%" y="100" dominant-baseline="middle" text-anchor="middle" fill="#94a3b8" font-family="sans-serif" font-size="12">${text}</text>
-  </svg>`;
-  return `data:image/svg+xml;base64,${btoa(svg)}`;
-}
-
-/**
- * Detect video source type from URL
- */
-function getVideoSourceType(url) {
-  if (!url) return 'unknown';
-  if (getYouTubeVideoId(url)) return 'youtube';
-  if (getLoomVideoId(url)) return 'loom';
-  if (getVimeoVideoId(url)) return 'vimeo';
-  return 'unknown';
-}
-
-/**
- * Show video thumbnail with loading state
- */
-function showVideo(videoUrl) {
+function showVideo(videoUrl, autoplay = false) {
   videoContainer.classList.remove('hidden');
 
-  const sourceType = getVideoSourceType(videoUrl);
-  const thumbnailUrl = getThumbnailUrl(videoUrl);
+  // Check if we can embed the video
+  if (videoEmbedder.canEmbed(videoUrl)) {
+    // Show thumbnail first, click to embed
+    const thumbnailUrl = getThumbnailUrl(videoUrl);
+    const fallbackUrl = getFallbackThumbnailUrl(videoUrl);
 
-  // Show loading state initially
-  videoThumbImg.classList.add('loading');
-
-  if (thumbnailUrl) {
-    // Create temp image to preload thumbnail
-    const tempThumb = new Image();
-
-    tempThumb.onload = () => {
-      videoThumbImg.src = thumbnailUrl;
-      videoThumbImg.classList.remove('loading');
-      console.log('[Renderer] Video thumbnail loaded for', sourceType);
+    // Function to load thumbnail with fallback
+    const loadThumbnail = () => {
+      if (thumbnailUrl) {
+        const preloadedThumb = mediaPreloader.getAsset(thumbnailUrl);
+        if (preloadedThumb) {
+          videoThumbImg.src = thumbnailUrl;
+          videoThumbImg.classList.remove('loading');
+          console.log('[Renderer] Using preloaded thumbnail');
+        } else {
+          videoThumbImg.classList.add('loading');
+          const tempThumb = new Image();
+          tempThumb.onload = () => {
+            videoThumbImg.src = thumbnailUrl;
+            videoThumbImg.classList.remove('loading');
+            console.log('[Renderer] Thumbnail loaded:', thumbnailUrl);
+          };
+          tempThumb.onerror = () => {
+            // Try fallback URL
+            if (fallbackUrl && fallbackUrl !== thumbnailUrl) {
+              console.log('[Renderer] Trying fallback thumbnail');
+              const fallbackThumb = new Image();
+              fallbackThumb.onload = () => {
+                videoThumbImg.src = fallbackUrl;
+                videoThumbImg.classList.remove('loading');
+              };
+              fallbackThumb.onerror = () => {
+                videoThumbImg.src = createVideoPlaceholder('Click to play');
+                videoThumbImg.classList.remove('loading');
+              };
+              fallbackThumb.src = fallbackUrl;
+            } else {
+              videoThumbImg.src = createVideoPlaceholder('Click to play');
+              videoThumbImg.classList.remove('loading');
+            }
+          };
+          tempThumb.src = thumbnailUrl;
+        }
+      } else {
+        videoThumbImg.src = createVideoPlaceholder('Click to play');
+        videoThumbImg.classList.remove('loading');
+      }
     };
 
-    tempThumb.onerror = () => {
-      console.warn('[Renderer] Thumbnail failed to load, using placeholder');
-      // Use a placeholder with source name if thumbnail fails
-      const placeholderText = sourceType === 'unknown' ? 'Click to play video' : `${sourceType.charAt(0).toUpperCase() + sourceType.slice(1)} Video`;
-      videoThumbImg.src = createVideoPlaceholder(placeholderText);
-      videoThumbImg.classList.remove('loading');
-    };
+    // Always load thumbnail first
+    loadThumbnail();
 
-    tempThumb.src = thumbnailUrl;
+    // If autoplay, embed immediately (muted autoplay)
+    if (autoplay) {
+      console.log('[Renderer] Video autoplay enabled, embedding immediately');
+      // Small delay to ensure thumbnail is visible before embed
+      setTimeout(() => {
+        embedVideo(videoUrl, true);
+      }, 100);
+    } else {
+      // Click to embed
+      videoThumbnail.onclick = () => {
+        embedVideo(videoUrl, true);
+      };
+    }
   } else {
-    // Placeholder for unknown video sources
-    videoThumbImg.src = createVideoPlaceholder('Click to play video');
+    // Unknown video type - just show thumbnail and open in browser
+    videoThumbImg.src = createVideoPlaceholder('Click to open video');
     videoThumbImg.classList.remove('loading');
+    videoThumbnail.onclick = () => {
+      openVideoUrl(videoUrl);
+    };
   }
-
-  // Handle click to open video in browser
-  videoThumbnail.onclick = () => {
-    openVideoUrl(videoUrl);
-  };
 }
 
 /**
- * Show audio player with loading state and error handling
+ * Embed video in iframe
+ */
+function embedVideo(videoUrl, autoplay = false) {
+  if (isVideoEmbedded) return;
+
+  const iframe = videoEmbedder.createEmbed(videoUrl, autoplay);
+
+  if (iframe && videoEmbedContainer) {
+    // Hide thumbnail, show embed
+    videoThumbnail.classList.add('hidden');
+    videoEmbedContainer.classList.remove('hidden');
+    videoEmbedContainer.innerHTML = '';
+    videoEmbedContainer.appendChild(iframe);
+    isVideoEmbedded = true;
+
+    console.log('[Renderer] Video embedded');
+  }
+}
+
+/**
+ * Show audio player
  */
 function showAudio(audioUrl, autoplay = false) {
   audioContainer.classList.remove('hidden');
-
-  // Generate waveform visualization
   generateWaveform();
 
-  // Show autoplay badge if enabled
   if (autoplay) {
     audioAutoplayBadge.classList.remove('hidden');
   }
 
-  // Add loading indicator to waveform
   const audioLabel = audioContainer.querySelector('.audio-label');
   if (audioLabel) {
     audioLabel.textContent = 'Loading audio...';
   }
 
-  // Set audio source
-  audioPlayer.src = audioUrl;
-
-  // Handle successful audio load
-  audioPlayer.oncanplaythrough = () => {
-    console.log('[Renderer] Audio ready to play');
+  // Check if preloaded
+  const preloadedAudio = mediaPreloader.getAsset(audioUrl);
+  if (preloadedAudio) {
+    audioPlayer.src = audioUrl;
     if (audioLabel) {
       audioLabel.textContent = 'Audio message';
     }
-
-    // Auto-play if enabled
     if (autoplay) {
+      audioPlayer.play().catch(() => {
+        if (audioLabel) audioLabel.textContent = 'Click to play';
+      });
+    }
+  } else {
+    audioPlayer.src = audioUrl;
+  }
+
+  audioPlayer.oncanplaythrough = () => {
+    if (audioLabel) {
+      audioLabel.textContent = 'Audio message';
+    }
+    if (autoplay && !preloadedAudio) {
       audioPlayer.play().catch(err => {
         console.warn('[Renderer] Auto-play blocked:', err);
         if (audioLabel) {
@@ -494,18 +910,15 @@ function showAudio(audioUrl, autoplay = false) {
     }
   };
 
-  // Handle audio load error
-  audioPlayer.onerror = (e) => {
-    console.error('[Renderer] Failed to load audio:', audioUrl, e);
+  audioPlayer.onerror = () => {
+    console.error('[Renderer] Failed to load audio:', audioUrl);
     if (audioLabel) {
       audioLabel.textContent = 'Failed to load audio';
     }
-    // Gray out the waveform to indicate error
     const bars = audioWaveform.querySelectorAll('.audio-bar');
     bars.forEach(bar => {
       bar.style.background = 'rgba(100, 116, 139, 0.3)';
     });
-    // Update icon color to indicate error
     const audioIcon = audioContainer.querySelector('.audio-icon');
     if (audioIcon) {
       audioIcon.style.background = 'rgba(239, 68, 68, 0.2)';
@@ -514,7 +927,6 @@ function showAudio(audioUrl, autoplay = false) {
     }
   };
 
-  // Animate waveform when playing
   audioPlayer.onplay = () => {
     const bars = audioWaveform.querySelectorAll('.audio-bar');
     bars.forEach((bar, i) => {
@@ -542,9 +954,7 @@ function showAudio(audioUrl, autoplay = false) {
     }
   };
 
-  // Make audio container clickable to toggle playback
   audioContainer.onclick = (e) => {
-    // Don't play if there was a load error
     if (audioPlayer.error) {
       console.warn('[Renderer] Cannot play - audio failed to load');
       return;
@@ -570,30 +980,29 @@ function requestWindowResize(type) {
   if (!window.creaBomber) return;
 
   const sizes = {
-    'TEXT': { width: 400, height: 160 },
-    'TEXT_IMAGE': { width: 400, height: 340 },
-    'VIDEO': { width: 400, height: 300 },
-    'AUDIO': { width: 400, height: 220 }
+    'TEXT': { width: 450, height: 200 },
+    'TEXT_IMAGE': { width: 600, height: 550 },
+    'VIDEO': { width: 600, height: 500 },
+    'AUDIO': { width: 450, height: 250 }
   };
 
   const size = sizes[type] || sizes['TEXT'];
   window.creaBomber.requestResize(size.width, size.height);
 }
 
-/**
- * Initialize event handlers
- */
-function init() {
-  console.log('[Renderer] Initializing notification renderer...');
+// ============================================================
+// INITIALIZATION
+// ============================================================
 
-  // Close button
+function init() {
+  console.log('[Renderer] Initializing notification renderer with media preloading...');
+
   closeBtn.addEventListener('click', () => {
     if (window.creaBomber) {
       window.creaBomber.closeNotification();
     }
   });
 
-  // Subscribe to notifications from main process
   if (window.creaBomber) {
     window.creaBomber.onNotification((payload) => {
       showNotification(payload);
@@ -606,13 +1015,10 @@ function init() {
     console.log('[Renderer] Subscribed to notification events');
   } else {
     console.warn('[Renderer] creaBomber API not available - running outside Electron?');
-
-    // For development/testing without Electron
     window.showTestNotification = showNotification;
   }
 }
 
-// Initialize when DOM is ready
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', init);
 } else {

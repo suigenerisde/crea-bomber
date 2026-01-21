@@ -15,3 +15,4 @@ export {
   formatShortcut,
   type KeyboardShortcut,
 } from './useKeyboardShortcuts';
+export { useScheduledMessages, type UseScheduledMessagesResult } from './useScheduledMessages';

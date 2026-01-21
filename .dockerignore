@@ -1,0 +1,40 @@
+# Dependencies
+node_modules
+
+# Build outputs
+.next
+out
+dist
+
+# Git
+.git
+.gitignore
+
+# Client (Electron app - not needed for server)
+client/
+
+# Development files
+*.log
+*.md
+.env*.local
+.DS_Store
+
+# Data (will be mounted as volume)
+data/
+logs/
+
+# IDE
+.vscode
+.idea
+
+# Documentation
+docs/
+
+# Test files
+*.test.ts
+*.spec.ts
+__tests__/
+
+# Distribution files
+*.dmg
+*.app

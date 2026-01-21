@@ -428,7 +428,34 @@ export function getOnlineDevices(): Device[] {
 // Export database instance for advanced usage
 export { db };
 
-// Seed mock devices on initialization
-import('./mock-devices').then(({ seedMockDevices }) => {
-  seedMockDevices();
-});
+// Import and seed family devices
+import { FAMILY_DEVICES } from '@/config/family-devices';
+
+/**
+ * Seed family devices into the database
+ * These are pre-configured devices that will show up in the dashboard
+ * but won't be online until the actual client connects
+ */
+function seedFamilyDevices(): void {
+  const stmt = db.prepare(`
+    INSERT OR IGNORE INTO devices (id, name, hostname, status, last_seen, created_at)
+    VALUES (?, ?, ?, 'offline', ?, ?)
+  `);
+
+  const now = Date.now();
+  let seeded = 0;
+
+  for (const device of FAMILY_DEVICES) {
+    const result = stmt.run(device.id, device.name, device.hostname, now, now);
+    if (result.changes > 0) {
+      seeded++;
+    }
+  }
+
+  if (seeded > 0) {
+    console.log(`[DB] Seeded ${seeded} family devices`);
+  }
+}
+
+// Seed family devices on startup
+seedFamilyDevices();

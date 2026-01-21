@@ -9,12 +9,28 @@ import {
   getConnectionStatus,
   getServerUrl,
   setServerUrl,
+  getDeviceName,
+  setDeviceName,
   getOpenAtLogin,
   setOpenAtLogin,
   onStatusChange,
   reconnect,
   ConnectionStatus,
+  prepareForShutdown,
 } from './socket';
+
+// Flag to disable logging during shutdown
+let isShuttingDown = false;
+
+// Safe console log that doesn't throw on closed pipe
+function safeLog(...args: unknown[]): void {
+  if (isShuttingDown) return;
+  try {
+    console.log(...args);
+  } catch {
+    // Ignore EPIPE errors when process is shutting down
+  }
+}
 
 // Tray icon size (macOS standard)
 const ICON_SIZE = 22;
@@ -28,19 +44,14 @@ let settingsWindow: BrowserWindow | null = null;
  * @param color - The fill color for the icon
  */
 function createStatusIcon(color: string): Electron.NativeImage {
-  // Create SVG circle icon
-  const svg = `
-    <svg width="${ICON_SIZE}" height="${ICON_SIZE}" viewBox="0 0 ${ICON_SIZE} ${ICON_SIZE}" xmlns="http://www.w3.org/2000/svg">
-      <circle cx="${ICON_SIZE / 2}" cy="${ICON_SIZE / 2}" r="${ICON_SIZE / 2 - 2}" fill="${color}" stroke="rgba(255,255,255,0.3)" stroke-width="1"/>
-    </svg>
-  `;
+  // Create SVG circle icon as data URL (more reliable on macOS)
+  const svg = `<svg width="${ICON_SIZE}" height="${ICON_SIZE}" viewBox="0 0 ${ICON_SIZE} ${ICON_SIZE}" xmlns="http://www.w3.org/2000/svg"><circle cx="${ICON_SIZE / 2}" cy="${ICON_SIZE / 2}" r="${ICON_SIZE / 2 - 2}" fill="${color}"/></svg>`;
 
-  const buffer = Buffer.from(svg);
-  const image = nativeImage.createFromBuffer(buffer);
+  const dataUrl = `data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}`;
+  const image = nativeImage.createFromDataURL(dataUrl);
 
-  // For macOS, we need to set the image as template for proper menu bar appearance
-  // But since we're using colors, we don't set it as template
-  return image;
+  // Resize for proper display on macOS menu bar
+  return image.resize({ width: ICON_SIZE, height: ICON_SIZE });
 }
 
 /**
@@ -115,7 +126,7 @@ function buildTrayMenu(): Menu {
     {
       label: 'Reconnect',
       click: () => {
-        console.log('[Tray] Reconnect clicked');
+        safeLog('[Tray] Reconnect clicked');
         reconnect();
       },
       enabled: status !== 'connecting',
@@ -203,7 +214,7 @@ function openSettingsWindow(): void {
     settingsWindow = null;
   });
 
-  console.log('[Tray] Settings window opened');
+  safeLog('[Tray] Settings window opened');
 }
 
 /**
@@ -215,56 +226,16 @@ function applyLoginItemSetting(enabled: boolean): void {
     openAsHidden: true, // Start minimized to tray
     path: app.getPath('exe'),
   });
-  console.log(`[Tray] Login item setting applied: ${enabled}`);
+  safeLog(`[Tray] Login item setting applied: ${enabled}`);
 }
 
-/**
- * Setup IPC handlers for settings window
- */
-function setupSettingsIPC(): void {
-  // Get current settings
-  ipcMain.handle('settings:get', () => {
-    return {
-      serverUrl: getServerUrl(),
-      connectionStatus: getConnectionStatus(),
-      openAtLogin: getOpenAtLogin(),
-    };
-  });
-
-  // Save settings
-  ipcMain.handle('settings:save', (_event, settings: { serverUrl: string; openAtLogin?: boolean }) => {
-    const currentUrl = getServerUrl();
-    const currentOpenAtLogin = getOpenAtLogin();
-
-    // Update server URL if changed
-    if (settings.serverUrl && settings.serverUrl !== currentUrl) {
-      setServerUrl(settings.serverUrl);
-      console.log('[Tray] Server URL updated, reconnecting...');
-      reconnect();
-    }
-
-    // Update open at login if changed
-    if (typeof settings.openAtLogin === 'boolean' && settings.openAtLogin !== currentOpenAtLogin) {
-      setOpenAtLogin(settings.openAtLogin);
-      applyLoginItemSetting(settings.openAtLogin);
-    }
-
-    return { success: true };
-  });
-
-  // Close settings window
-  ipcMain.on('settings:close', () => {
-    if (settingsWindow && !settingsWindow.isDestroyed()) {
-      settingsWindow.close();
-    }
-  });
-}
+// Note: IPC handlers for settings are now in main.ts to avoid duplication
 
 /**
  * Initialize the system tray
  */
 export function initializeTray(): void {
-  console.log('[Tray] Initializing system tray...');
+  safeLog('[Tray] Initializing system tray...');
 
   // Create initial tray icon
   const initialStatus = getConnectionStatus();
@@ -279,24 +250,22 @@ export function initializeTray(): void {
 
   // Subscribe to connection status changes
   onStatusChange((status) => {
-    console.log(`[Tray] Connection status changed: ${status}`);
+    safeLog(`[Tray] Connection status changed: ${status}`);
     updateTrayIcon(status);
   });
 
-  // Setup IPC handlers for settings
-  setupSettingsIPC();
-
-  console.log('[Tray] System tray initialized');
+  safeLog('[Tray] System tray initialized');
 }
 
 /**
  * Destroy the system tray
  */
 export function destroyTray(): void {
+  isShuttingDown = true; // Disable logging before cleanup
+
   if (tray) {
     tray.destroy();
     tray = null;
-    console.log('[Tray] System tray destroyed');
   }
 
   if (settingsWindow && !settingsWindow.isDestroyed()) {

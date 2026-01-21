@@ -123,3 +123,35 @@ export interface DeliveryStatusUpdate {
   timestamp: number;
   overallStatus: MessageStatus;
 }
+
+// Scheduled message (from Supabase)
+export interface ScheduledMessage {
+  id: string;
+  date: string;  // ISO date string (YYYY-MM-DD)
+  recurring: boolean;
+  type: MessageType;
+  content: string;
+  imageUrl?: string;
+  videoUrl?: string;
+  audioUrl?: string;
+  videoAutoplay?: boolean;
+  audioAutoplay?: boolean;
+  targetDevices?: string[];  // null = all devices
+  createdAt: Date;
+  updatedAt: Date;
+  lastShownYear?: number;
+}
+
+// Form data for creating/editing scheduled messages
+export interface ScheduledMessageFormData {
+  date: string;
+  recurring: boolean;
+  type: MessageType;
+  content: string;
+  imageUrl?: string;
+  videoUrl?: string;
+  audioUrl?: string;
+  videoAutoplay?: boolean;
+  audioAutoplay?: boolean;
+  targetDevices?: string[];
+}

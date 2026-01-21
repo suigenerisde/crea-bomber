@@ -3,11 +3,22 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' https: data:; media-src 'self' https: data:; frame-src https://www.youtube.com https://www.loom.com https://player.vimeo.com;">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' https: data:; media-src 'self' https: data:; frame-src https://www.youtube.com https://www.youtube-nocookie.com https://www.loom.com https://player.vimeo.com; connect-src 'self' https://www.youtube.com https://www.youtube-nocookie.com https://www.loom.com https://player.vimeo.com;">
   <title>CreaBomber Notification</title>
   <link rel="stylesheet" href="notification.css">
 </head>
 <body>
+  <!-- Preload Overlay - shown while media is loading -->
+  <div id="preload-overlay" class="preload-overlay hidden">
+    <div class="preload-content">
+      <div class="preload-spinner">
+        <div class="preload-spinner-ring"></div>
+        <div class="preload-spinner-ring"></div>
+      </div>
+      <span class="preload-text">Lade Medien...</span>
+    </div>
+  </div>
+
   <div id="notification" class="notification hidden">
     <!-- Header -->
     <div class="notification-header">
@@ -44,6 +55,7 @@
 
       <!-- Video Container -->
       <div id="video-container" class="notification-video-container hidden">
+        <!-- Thumbnail View (click to play) -->
         <div id="video-thumbnail" class="video-thumbnail">
           <img id="video-thumb-img" class="video-thumb-img" alt="Video thumbnail">
           <div class="video-play-overlay">
@@ -54,6 +66,8 @@
             </div>
           </div>
         </div>
+        <!-- Embedded Video Player (for autoplay or after click) -->
+        <div id="video-embed-container" class="video-embed-container hidden"></div>
       </div>
 
       <!-- Audio Container -->

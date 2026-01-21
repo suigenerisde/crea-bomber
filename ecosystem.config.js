@@ -37,6 +37,8 @@ module.exports = {
         NODE_ENV: 'production',
         PORT: 3000,
         HOSTNAME: '0.0.0.0',
+        DATABASE_PATH: '/app/data/creabomber.db',
+        CORS_ORIGINS: 'https://bomber.suimation.de,http://localhost:3000,http://127.0.0.1:3000',
       },
 
       // Environment variables for development

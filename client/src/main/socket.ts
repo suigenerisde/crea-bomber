@@ -11,15 +11,53 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { showNotification } from './main';
 
+// Flag to disable logging during shutdown (prevents EPIPE errors)
+let isShuttingDown = false;
+
+// Call this before app quits to prevent EPIPE errors
+export function prepareForShutdown(): void {
+  isShuttingDown = true;
+}
+
+// Safe console log that doesn't throw on closed pipe
+function safeLog(...args: unknown[]): void {
+  if (isShuttingDown) return;
+  try {
+    console.log(...args);
+  } catch {
+    // Ignore any logging errors
+  }
+}
+
 // Configuration
-const DEFAULT_SERVER_URL = 'http://localhost:3000';
+// Priority: SERVER_URL env > development mode > production default
+// Production: VPS server at bomber.suimation.de
+// Development: localhost:3000
+const DEFAULT_SERVER_URL = process.env.SERVER_URL || (
+  process.env.NODE_ENV === 'development'
+    ? 'http://localhost:3000'
+    : 'https://bomber.suimation.de'
+);
 const HEARTBEAT_INTERVAL = 30000; // 30 seconds
 const INITIAL_RECONNECT_DELAY = 1000; // 1 second
 const MAX_RECONNECT_DELAY = 30000; // 30 seconds
 
+// Pre-configured device settings (set via environment variables at build time)
+// If these are set, the client is considered "pre-configured" and won't show settings
+const PRECONFIGURED_DEVICE_ID = process.env.DEVICE_ID || '';
+const PRECONFIGURED_DEVICE_NAME = process.env.DEVICE_NAME || '';
+
+/**
+ * Check if this client is pre-configured (has hardcoded device ID/name)
+ */
+export function isPreconfigured(): boolean {
+  return !!(PRECONFIGURED_DEVICE_ID && PRECONFIGURED_DEVICE_NAME);
+}
+
 // Store schema for persistent device settings
 interface StoreSchema {
   deviceId: string;
+  deviceName: string;
   serverUrl: string;
   notificationDuration: number;
   soundEnabled: boolean;
@@ -108,6 +146,7 @@ function getStore(): SimpleStore {
   if (!store) {
     store = new SimpleStore({
       deviceId: '',
+      deviceName: '',
       serverUrl: DEFAULT_SERVER_URL,
       notificationDuration: 8000,
       soundEnabled: true,
@@ -127,18 +166,68 @@ let statusCallbacks: StatusCallback[] = [];
 
 /**
  * Get or create a persistent device ID
+ * If preconfigured, always use the hardcoded ID
  */
 function getDeviceId(): string {
+  // Use preconfigured ID if available
+  if (PRECONFIGURED_DEVICE_ID) {
+    return PRECONFIGURED_DEVICE_ID;
+  }
+
   const storage = getStore();
   let deviceId = storage.get('deviceId');
 
   if (!deviceId) {
     deviceId = uuidv4();
     storage.set('deviceId', deviceId);
-    console.log(`[Socket] Generated new device ID: ${deviceId}`);
+    safeLog(`[Socket] Generated new device ID: ${deviceId}`);
   }
 
   return deviceId;
+}
+
+/**
+ * Get or generate a default device name
+ */
+function getDefaultDeviceName(): string {
+  // Create a friendly name from hostname
+  const hostname = os.hostname();
+  // Remove common suffixes and clean up
+  const cleanName = hostname
+    .replace(/\.local$/, '')
+    .replace(/-/g, ' ')
+    .replace(/\b\w/g, (c) => c.toUpperCase()); // Title case
+  return cleanName;
+}
+
+/**
+ * Get the device name from store or generate default
+ * If preconfigured, always use the hardcoded name
+ */
+export function getDeviceName(): string {
+  // Use preconfigured name if available
+  if (PRECONFIGURED_DEVICE_NAME) {
+    return PRECONFIGURED_DEVICE_NAME;
+  }
+
+  const storage = getStore();
+  let deviceName = storage.get('deviceName');
+
+  if (!deviceName) {
+    deviceName = getDefaultDeviceName();
+    storage.set('deviceName', deviceName);
+    safeLog(`[Socket] Generated default device name: ${deviceName}`);
+  }
+
+  return deviceName;
+}
+
+/**
+ * Set a custom device name
+ */
+export function setDeviceName(name: string): void {
+  getStore().set('deviceName', name);
+  safeLog(`[Socket] Device name updated: ${name}`);
 }
 
 /**
@@ -147,7 +236,7 @@ function getDeviceId(): string {
 export function getDeviceInfo(): DeviceInfo {
   return {
     id: getDeviceId(),
-    name: `${os.hostname()}-${os.platform()}`,
+    name: getDeviceName(),
     hostname: os.hostname(),
     platform: os.platform(),
     connected: connectionStatus === 'connected',
@@ -178,15 +267,19 @@ export function onStatusChange(callback: StatusCallback): () => void {
 function setConnectionStatus(status: ConnectionStatus): void {
   if (connectionStatus !== status) {
     connectionStatus = status;
-    console.log(`[Socket] Connection status: ${status}`);
+    safeLog(`[Socket] Connection status: ${status}`);
     statusCallbacks.forEach(cb => cb(status));
   }
 }
 
 /**
- * Get the server URL from store
+ * Get the server URL (env var takes priority over store)
  */
 export function getServerUrl(): string {
+  // Environment variable always takes priority (for pre-configured clients)
+  if (process.env.SERVER_URL) {
+    return process.env.SERVER_URL;
+  }
   return getStore().get('serverUrl');
 }
 
@@ -195,7 +288,7 @@ export function getServerUrl(): string {
  */
 export function setServerUrl(url: string): void {
   getStore().set('serverUrl', url);
-  console.log(`[Socket] Server URL updated: ${url}`);
+  safeLog(`[Socket] Server URL updated: ${url}`);
 }
 
 /**
@@ -210,7 +303,31 @@ export function getOpenAtLogin(): boolean {
  */
 export function setOpenAtLogin(enabled: boolean): void {
   getStore().set('openAtLogin', enabled);
-  console.log(`[Socket] Open at login updated: ${enabled}`);
+  safeLog(`[Socket] Open at login updated: ${enabled}`);
+}
+
+/**
+ * Check if this is the first run (no device name has been set by user)
+ * Preconfigured clients are never considered "first run"
+ */
+export function isFirstRun(): boolean {
+  // Preconfigured clients never need setup
+  if (isPreconfigured()) {
+    return false;
+  }
+
+  const storage = getStore();
+  // If deviceName is empty or matches the auto-generated hostname name, it's first run
+  const deviceName = storage.get('deviceName');
+  return !deviceName || deviceName === getDefaultDeviceName();
+}
+
+/**
+ * Mark first run as complete (called after user saves settings)
+ */
+export function markFirstRunComplete(): void {
+  // This is implicit - once user saves a custom name, isFirstRun returns false
+  safeLog('[Socket] First run setup complete');
 }
 
 /**
@@ -226,11 +343,11 @@ function startHeartbeat(): void {
         deviceId: deviceInfo.id,
         timestamp: Date.now(),
       });
-      console.log('[Socket] Heartbeat sent');
+      safeLog('[Socket] Heartbeat sent');
     }
   }, HEARTBEAT_INTERVAL);
 
-  console.log(`[Socket] Heartbeat started (every ${HEARTBEAT_INTERVAL / 1000}s)`);
+  safeLog(`[Socket] Heartbeat started (every ${HEARTBEAT_INTERVAL / 1000}s)`);
 }
 
 /**
@@ -240,7 +357,7 @@ function stopHeartbeat(): void {
   if (heartbeatInterval) {
     clearInterval(heartbeatInterval);
     heartbeatInterval = null;
-    console.log('[Socket] Heartbeat stopped');
+    safeLog('[Socket] Heartbeat stopped');
   }
 }
 
@@ -252,7 +369,7 @@ function scheduleReconnect(): void {
     clearTimeout(reconnectTimeout);
   }
 
-  console.log(`[Socket] Scheduling reconnect in ${reconnectDelay / 1000}s`);
+  safeLog(`[Socket] Scheduling reconnect in ${reconnectDelay / 1000}s`);
 
   reconnectTimeout = setTimeout(() => {
     reconnectTimeout = null;
@@ -276,14 +393,14 @@ function resetReconnectDelay(): void {
 export function connect(): void {
   // Don't connect if already connected or connecting
   if (socket && (socket.connected || connectionStatus === 'connecting')) {
-    console.log('[Socket] Already connected or connecting');
+    safeLog('[Socket] Already connected or connecting');
     return;
   }
 
   const serverUrl = getServerUrl();
   const deviceInfo = getDeviceInfo();
 
-  console.log(`[Socket] Connecting to ${serverUrl}...`);
+  safeLog(`[Socket] Connecting to ${serverUrl}...`);
   setConnectionStatus('connecting');
 
   // Create socket connection
@@ -295,7 +412,7 @@ export function connect(): void {
 
   // Connection established
   socket.on('connect', () => {
-    console.log('[Socket] Connected to server');
+    safeLog('[Socket] Connected to server');
     setConnectionStatus('connected');
     resetReconnectDelay();
 
@@ -306,7 +423,7 @@ export function connect(): void {
       hostname: deviceInfo.hostname,
     });
 
-    console.log(`[Socket] Device registered: ${deviceInfo.id}`);
+    safeLog(`[Socket] Device registered: ${deviceInfo.id}`);
 
     // Start heartbeat
     startHeartbeat();
@@ -322,7 +439,7 @@ export function connect(): void {
 
   // Disconnected
   socket.on('disconnect', (reason) => {
-    console.log(`[Socket] Disconnected: ${reason}`);
+    safeLog(`[Socket] Disconnected: ${reason}`);
     setConnectionStatus('disconnected');
     stopHeartbeat();
 
@@ -334,7 +451,7 @@ export function connect(): void {
 
   // Receive message from server
   socket.on('message:receive', (payload: MessagePayload) => {
-    console.log(`[Socket] Message received: ${payload.id} (type: ${payload.type})`);
+    safeLog(`[Socket] Message received: ${payload.id} (type: ${payload.type})`);
 
     // Check if this device is a target
     const deviceId = getDeviceId();
@@ -347,24 +464,24 @@ export function connect(): void {
         deviceId: deviceId,
         timestamp: Date.now(),
       });
-      console.log(`[Socket] Delivery acknowledged for message: ${payload.id}`);
+      safeLog(`[Socket] Delivery acknowledged for message: ${payload.id}`);
     } else {
-      console.log('[Socket] Message not targeted at this device, ignoring');
+      safeLog('[Socket] Message not targeted at this device, ignoring');
     }
   });
 
   // Device registration acknowledged (server sends { device } object on success)
   socket.on('device:registered', (data: { device?: unknown }) => {
     if (data.device) {
-      console.log('[Socket] Device registration acknowledged by server');
+      safeLog('[Socket] Device registration acknowledged by server');
     } else {
-      console.log('[Socket] Device registration acknowledged');
+      safeLog('[Socket] Device registration acknowledged');
     }
   });
 
   // Server requesting re-registration (e.g., after server restart)
   socket.on('device:reregister', () => {
-    console.log('[Socket] Server requested re-registration');
+    safeLog('[Socket] Server requested re-registration');
     const info = getDeviceInfo();
     socket!.emit('device:register', {
       deviceId: info.id,
@@ -378,7 +495,7 @@ export function connect(): void {
  * Disconnect from the server
  */
 export function disconnect(): void {
-  console.log('[Socket] Disconnecting...');
+  safeLog('[Socket] Disconnecting...');
 
   stopHeartbeat();
 
@@ -393,14 +510,14 @@ export function disconnect(): void {
   }
 
   setConnectionStatus('disconnected');
-  console.log('[Socket] Disconnected');
+  safeLog('[Socket] Disconnected');
 }
 
 /**
  * Reconnect to the server (disconnect then connect)
  */
 export function reconnect(): void {
-  console.log('[Socket] Reconnecting...');
+  safeLog('[Socket] Reconnecting...');
   disconnect();
   resetReconnectDelay();
   connect();

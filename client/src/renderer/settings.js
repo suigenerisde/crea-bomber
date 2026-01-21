@@ -6,6 +6,7 @@
 // DOM elements
 const statusDot = document.getElementById('statusDot');
 const statusText = document.getElementById('statusText');
+const deviceNameInput = document.getElementById('deviceName');
 const serverUrlInput = document.getElementById('serverUrl');
 const openAtLoginCheckbox = document.getElementById('openAtLogin');
 const settingsForm = document.getElementById('settingsForm');
@@ -41,6 +42,7 @@ async function loadSettings() {
     const settings = await window.creaBomber.getSettings();
 
     if (settings) {
+      deviceNameInput.value = settings.deviceName || '';
       serverUrlInput.value = settings.serverUrl || '';
       openAtLoginCheckbox.checked = settings.openAtLogin || false;
       updateStatusUI(settings.connectionStatus);
@@ -51,6 +53,7 @@ async function loadSettings() {
     try {
       const serverUrl = await window.creaBomber.getServerUrl();
       const status = await window.creaBomber.getConnectionStatus();
+      deviceNameInput.value = '';
       serverUrlInput.value = serverUrl || '';
       openAtLoginCheckbox.checked = false;
       updateStatusUI(status);
@@ -67,7 +70,13 @@ async function loadSettings() {
 async function saveSettings(event) {
   event.preventDefault();
 
+  const deviceName = deviceNameInput.value.trim();
   const serverUrl = serverUrlInput.value.trim();
+
+  if (!deviceName) {
+    deviceNameInput.focus();
+    return;
+  }
 
   if (!serverUrl) {
     serverUrlInput.focus();
@@ -89,7 +98,7 @@ async function saveSettings(event) {
 
   try {
     const openAtLogin = openAtLoginCheckbox.checked;
-    const result = await window.creaBomber.saveSettings({ serverUrl, openAtLogin });
+    const result = await window.creaBomber.saveSettings({ deviceName, serverUrl, openAtLogin });
 
     if (result && result.success) {
       // Settings saved successfully, close window

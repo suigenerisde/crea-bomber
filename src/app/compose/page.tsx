@@ -8,6 +8,7 @@ import { DeviceSelector } from '@/components/devices';
 import { Card, Badge, PageTransition, SuccessAnimation, SkeletonDeviceCard } from '@/components/ui';
 import { useSocket, useDevices, useMessages, useSoundNotification, useKeyboardShortcuts } from '@/hooks';
 import { useToast } from '@/contexts';
+import { BroadcastToggle, DeviceStatusPanel } from '@/components/devices';
 
 export default function ComposePage() {
   const router = useRouter();
@@ -15,6 +16,7 @@ export default function ComposePage() {
   const toast = useToast();
   const { playSend, playSuccess, playError } = useSoundNotification();
   const [selectedDevices, setSelectedDevices] = useState<string[]>([]);
+  const [broadcastMode, setBroadcastMode] = useState<'all' | 'selected'>('all');
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewMessage, setPreviewMessage] = useState<MessageData | null>(null);
   const [isSending, setIsSending] = useState(false);
@@ -25,19 +27,31 @@ export default function ComposePage() {
   const { devices, loading: devicesLoading, error: devicesError } = useDevices({ socket });
   const { createMessage, creating } = useMessages({ socket, autoFetch: false });
 
-  const handlePreview = (data: MessageData) => {
-    if (selectedDevices.length === 0) {
-      toast.error('Please select at least one device');
-      playError();
-      return;
+  // Get the effective target devices based on broadcast mode
+  const getTargetDevices = useCallback(() => {
+    if (broadcastMode === 'all') {
+      // In broadcast mode, target all online devices
+      return devices.filter((d) => d.status === 'online').map((d) => d.id);
     }
+    return selectedDevices;
+  }, [broadcastMode, devices, selectedDevices]);
+
+  const handlePreview = (data: MessageData) => {
+    // Preview is always allowed - user can see the notification
+    // Send button in modal will be disabled if no devices are targeted
     setPreviewMessage(data);
     setPreviewOpen(true);
   };
 
   const handleSend = useCallback(async (data: MessageData) => {
-    if (selectedDevices.length === 0) {
-      toast.error('Please select at least one device');
+    const targetDevices = getTargetDevices();
+
+    if (targetDevices.length === 0) {
+      toast.error(
+        broadcastMode === 'all'
+          ? 'No devices are online'
+          : 'Please select at least one device'
+      );
       playError();
       return;
     }
@@ -49,7 +63,7 @@ export default function ComposePage() {
       await createMessage({
         type: data.type,
         content: data.content,
-        targetDevices: selectedDevices,
+        targetDevices: targetDevices,
         imageUrl: data.imageUrl,
         videoUrl: data.videoUrl,
         audioUrl: data.audioUrl,
@@ -70,15 +84,16 @@ export default function ComposePage() {
       playError();
       setIsSending(false);
     }
-  }, [selectedDevices, toast, playError, playSend, playSuccess, createMessage, router]);
+  }, [getTargetDevices, broadcastMode, toast, playError, playSend, playSuccess, createMessage, router]);
 
   // Handler to trigger send via keyboard shortcut
   const handleKeyboardSend = useCallback(() => {
-    if (composerRef.current?.isValid() && selectedDevices.length > 0 && !isSending && !creating) {
+    const targetDevices = getTargetDevices();
+    if (composerRef.current?.isValid() && targetDevices.length > 0 && !isSending && !creating) {
       const data = composerRef.current.getMessageData();
       handleSend(data);
     }
-  }, [selectedDevices, isSending, creating, handleSend]);
+  }, [getTargetDevices, isSending, creating, handleSend]);
 
   // Keyboard shortcuts: Cmd+Enter to send message
   useKeyboardShortcuts([
@@ -149,7 +164,7 @@ export default function ComposePage() {
                   </div>
                   <span className="text-white font-medium">Sending message...</span>
                   <span className="text-slate-400 text-sm">
-                    To {selectedDevices.length} device{selectedDevices.length !== 1 ? 's' : ''}
+                    To {getTargetDevices().length} device{getTargetDevices().length !== 1 ? 's' : ''}
                   </span>
                 </div>
               </div>
@@ -157,11 +172,28 @@ export default function ComposePage() {
           </div>
 
           {/* Device Selector - Takes 1/3 width on large screens */}
-          <div className="lg:col-span-1">
+          <div className="lg:col-span-1 space-y-4">
+            {/* Broadcast Mode Toggle */}
             <Card
               header={
                 <div className="flex items-center justify-between">
-                  <span className="font-medium text-white">Target Devices</span>
+                  <span className="font-medium text-white">Sende-Modus</span>
+                </div>
+              }
+            >
+              <BroadcastToggle
+                mode={broadcastMode}
+                onChange={setBroadcastMode}
+                onlineCount={devices.filter((d) => d.status === 'online').length}
+                selectedCount={selectedDevices.length}
+              />
+            </Card>
+
+            {/* Device Status Panel (always shown) */}
+            <Card
+              header={
+                <div className="flex items-center justify-between">
+                  <span className="font-medium text-white">Geraete-Status</span>
                   {devicesLoading && (
                     <Badge variant="neutral" size="sm">Loading...</Badge>
                   )}
@@ -198,18 +230,22 @@ export default function ComposePage() {
                 </div>
               ) : (
                 <div className="animate-fade-in">
-                  <DeviceSelector
-                    devices={devices}
-                    selectedIds={selectedDevices}
-                    onChange={setSelectedDevices}
-                  />
+                  {broadcastMode === 'all' ? (
+                    <DeviceStatusPanel devices={devices} />
+                  ) : (
+                    <DeviceSelector
+                      devices={devices}
+                      selectedIds={selectedDevices}
+                      onChange={setSelectedDevices}
+                    />
+                  )}
                 </div>
               )}
             </Card>
 
             {/* Connection warning */}
             {!isConnected && (
-              <div className="mt-4 p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg animate-fade-in">
+              <div className="p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg animate-fade-in">
                 <p className="text-yellow-400 text-sm font-medium">Connection Issue</p>
                 <p className="text-yellow-400/70 text-xs mt-1">
                   WebSocket disconnected. Messages may not be delivered in real-time.
@@ -224,7 +260,7 @@ export default function ComposePage() {
           <PreviewModal
             isOpen={previewOpen}
             message={previewMessage}
-            targetDeviceCount={selectedDevices.length}
+            targetDeviceCount={getTargetDevices().length}
             onClose={() => setPreviewOpen(false)}
             onSend={handlePreviewSend}
             onEdit={handlePreviewEdit}

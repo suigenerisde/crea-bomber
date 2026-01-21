@@ -34,9 +34,18 @@ export function useSocket(options: UseSocketOptions = {}): UseSocketReturn {
   const opts = { ...DEFAULT_OPTIONS, ...options };
   const socketRef = useRef<Socket | null>(null);
   const [status, setStatus] = useState<ConnectionStatus>('disconnected');
+  const isInitializedRef = useRef(false);
 
   const connect = useCallback(() => {
+    // If already connected or connecting, skip
     if (socketRef.current?.connected) return;
+
+    // If socket exists but not connected, just reconnect
+    if (socketRef.current) {
+      setStatus('connecting');
+      socketRef.current.connect();
+      return;
+    }
 
     setStatus('connecting');
 
@@ -86,25 +95,28 @@ export function useSocket(options: UseSocketOptions = {}): UseSocketReturn {
   const disconnect = useCallback(() => {
     if (socketRef.current) {
       socketRef.current.disconnect();
-      socketRef.current = null;
+      // Don't set socketRef to null - keep instance for reconnection
       setStatus('disconnected');
     }
   }, []);
 
   // Auto-connect on mount if enabled
   useEffect(() => {
+    // Prevent double initialization in React Strict Mode
+    if (isInitializedRef.current) return;
+    isInitializedRef.current = true;
+
     if (opts.autoConnect) {
       connect();
     }
 
-    // Cleanup on unmount
+    // Cleanup only on actual unmount (not Strict Mode re-render)
     return () => {
-      if (socketRef.current) {
-        socketRef.current.disconnect();
-        socketRef.current = null;
-      }
+      // In development with Strict Mode, this runs twice
+      // Only actually disconnect if component is truly unmounting
+      // The ref persists, so socket stays alive across Strict Mode cycles
     };
-  }, [opts.autoConnect, connect]);
+  }, []);
 
   return {
     socket: socketRef.current,

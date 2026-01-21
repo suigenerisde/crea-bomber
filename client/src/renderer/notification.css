@@ -18,7 +18,8 @@ body {
 
 /* Main notification container */
 .notification {
-  width: 380px;
+  width: 100%;
+  max-width: 580px;
   background: rgba(30, 41, 59, 0.95); /* slate-800/95 */
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
@@ -171,8 +172,8 @@ body {
 
 .notification-image {
   width: 100%;
-  max-height: 192px;
-  object-fit: cover;
+  max-height: 420px;
+  object-fit: contain;
   display: block;
 }
 
@@ -201,8 +202,8 @@ body {
 
 .video-thumb-img {
   width: 100%;
-  height: 128px;
-  object-fit: cover;
+  height: 360px;
+  object-fit: contain;
   display: block;
   transition: opacity 0.3s ease;
 }
@@ -396,6 +397,130 @@ body {
 
 .notification-audio-container.error .audio-bar {
   background: rgba(100, 116, 139, 0.3);
+}
+
+/* Preload Overlay */
+.preload-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(15, 23, 42, 0.95);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  z-index: 100;
+  animation: fadeIn 0.2s ease;
+}
+
+.preload-overlay.hidden {
+  display: none;
+}
+
+.preload-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.preload-spinner {
+  position: relative;
+  width: 48px;
+  height: 48px;
+}
+
+.preload-spinner-ring {
+  position: absolute;
+  inset: 0;
+  border: 3px solid transparent;
+  border-radius: 50%;
+}
+
+.preload-spinner-ring:first-child {
+  border-top-color: #3b82f6;
+  animation: spin 1s linear infinite;
+}
+
+.preload-spinner-ring:last-child {
+  border-bottom-color: #9333ea;
+  animation: spin 1.5s linear infinite reverse;
+}
+
+.preload-text {
+  font-size: 14px;
+  color: #94a3b8;
+  font-weight: 500;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Video Embed Container */
+.video-embed-container {
+  position: relative;
+  width: 100%;
+  padding-bottom: 56.25%; /* 16:9 aspect ratio */
+  height: 0;
+  overflow: hidden;
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.8);
+}
+
+.video-embed-container.hidden {
+  display: none;
+}
+
+.video-embed-container iframe {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  border: none;
+  border-radius: 8px;
+}
+
+/* Video loading state */
+.video-embed-container.loading::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(15, 23, 42, 0.9);
+  z-index: 1;
+}
+
+.video-embed-container.loading::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 32px;
+  height: 32px;
+  border: 3px solid rgba(59, 130, 246, 0.3);
+  border-top-color: #3b82f6;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  z-index: 2;
+}
+
+/* Video thumbnail adjustments for embed mode */
+.video-thumbnail.hidden-for-embed {
+  display: none;
+}
+
+/* Direct MP4 video element */
+.notification-video-container video {
+  width: 100%;
+  max-height: 360px;
+  border-radius: 8px;
+  background: #0f172a;
 }
 
 /* Utility classes */

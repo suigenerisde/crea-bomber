@@ -79,10 +79,16 @@ export function PreviewModal({
           >
             Preview Notification
           </h2>
-          <p className="text-sm text-slate-400 mt-1">
-            This is how your message will appear on {targetDeviceCount} device
-            {targetDeviceCount !== 1 ? 's' : ''}
-          </p>
+          {targetDeviceCount > 0 ? (
+            <p className="text-sm text-slate-400 mt-1">
+              This is how your message will appear on {targetDeviceCount} device
+              {targetDeviceCount !== 1 ? 's' : ''}
+            </p>
+          ) : (
+            <p className="text-sm text-yellow-400 mt-1">
+              No devices selected - select devices before sending
+            </p>
+          )}
         </div>
 
         {/* Mac Screen Bezel Frame */}
@@ -117,9 +123,10 @@ export function PreviewModal({
           <Button
             variant="primary"
             onClick={onSend}
+            disabled={targetDeviceCount === 0}
             iconLeft={<Send className="w-4 h-4" />}
           >
-            Looks good - Send
+            {targetDeviceCount === 0 ? 'Select Devices First' : 'Looks good - Send'}
           </Button>
         </div>
       </div>

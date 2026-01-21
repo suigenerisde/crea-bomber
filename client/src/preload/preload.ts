@@ -16,6 +16,7 @@ interface MessagePayload {
   imageUrl?: string;
   videoUrl?: string;
   audioUrl?: string;
+  videoAutoplay?: boolean;
   audioAutoplay?: boolean;
   targetDevices: string[];
   timestamp: number;
@@ -106,6 +107,14 @@ const creaBomberAPI = {
   },
 
   /**
+   * Notify main process that preloading is complete and window can be shown
+   * Called after all media assets have been loaded
+   */
+  notifyPreloadComplete: (): void => {
+    ipcRenderer.send('notification:preload-complete');
+  },
+
+  /**
    * Get device information
    * Returns device ID, name, hostname, platform, and connection status
    */
@@ -132,14 +141,14 @@ const creaBomberAPI = {
   /**
    * Get all settings (for settings window)
    */
-  getSettings: async (): Promise<{ serverUrl: string; connectionStatus: ConnectionStatus; openAtLogin: boolean }> => {
+  getSettings: async (): Promise<{ deviceName: string; serverUrl: string; connectionStatus: ConnectionStatus; openAtLogin: boolean }> => {
     return ipcRenderer.invoke('settings:get');
   },
 
   /**
    * Save settings (for settings window)
    */
-  saveSettings: async (settings: { serverUrl: string; openAtLogin?: boolean }): Promise<{ success: boolean }> => {
+  saveSettings: async (settings: { deviceName?: string; serverUrl: string; openAtLogin?: boolean }): Promise<{ success: boolean }> => {
     return ipcRenderer.invoke('settings:save', settings);
   },
 

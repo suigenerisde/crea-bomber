@@ -28,8 +28,9 @@ import type {
 // Store socket-to-device mapping
 const socketDeviceMap = new Map<string, string>();
 
-// Timeout for marking devices offline (30 seconds without heartbeat)
-const OFFLINE_TIMEOUT = 30000;
+// Timeout for marking devices offline (45 seconds without heartbeat)
+// Note: Client heartbeat is every 30s, so 45s gives buffer for network latency
+const OFFLINE_TIMEOUT = 45000;
 
 // Track heartbeat timeouts per device
 const heartbeatTimeouts = new Map<string, NodeJS.Timeout>();
