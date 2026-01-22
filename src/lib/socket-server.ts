@@ -35,7 +35,16 @@ const OFFLINE_TIMEOUT = 45000;
 // Track heartbeat timeouts per device
 const heartbeatTimeouts = new Map<string, NodeJS.Timeout>();
 
-let io: Server | null = null;
+// Use global to persist socket server across module reloads in development
+declare global {
+  // eslint-disable-next-line no-var
+  var __socketIO: Server | null;
+}
+
+// Initialize global if not exists
+if (!global.__socketIO) {
+  global.__socketIO = null;
+}
 
 /**
  * Initialize Socket.io server with the given HTTP server
@@ -45,7 +54,7 @@ let io: Server | null = null;
 export function initSocketServer(httpServer: HttpServer, corsOrigins?: string[]): Server {
   const origins = corsOrigins || ['http://localhost:3000', 'http://127.0.0.1:3000'];
 
-  io = new Server(httpServer, {
+  global.__socketIO = new Server(httpServer, {
     cors: {
       origin: origins,
       methods: ['GET', 'POST'],
@@ -55,7 +64,7 @@ export function initSocketServer(httpServer: HttpServer, corsOrigins?: string[])
     pingInterval: 10000,
   });
 
-  io.on('connection', (socket: Socket) => {
+  global.__socketIO.on('connection', (socket: Socket) => {
     console.log(`[Socket] Client connected: ${socket.id}`);
 
     // Handle device registration
@@ -85,7 +94,7 @@ export function initSocketServer(httpServer: HttpServer, corsOrigins?: string[])
   });
 
   console.log('[Socket] Socket.io server initialized');
-  return io;
+  return global.__socketIO;
 }
 
 /**
@@ -166,8 +175,8 @@ function handleMessageSend(socket: Socket, payload: MessagePayload): void {
 
   // Emit to each target device room
   for (const deviceId of targetDevices) {
-    if (io) {
-      io.to(`device:${deviceId}`).emit('message:receive', {
+    if (global.__socketIO) {
+      global.__socketIO.to(`device:${deviceId}`).emit('message:receive', {
         ...payload,
         id: message.id,
         timestamp: message.createdAt.getTime(),
@@ -208,7 +217,7 @@ function handleMessageDelivered(socket: Socket, payload: DeliveryAckPayload): vo
   const message = getMessageWithDeliveries(messageId);
 
   // Broadcast delivery status update to all dashboard clients
-  if (io) {
+  if (global.__socketIO) {
     const statusUpdate: DeliveryStatusUpdate = {
       messageId,
       deviceId,
@@ -217,11 +226,11 @@ function handleMessageDelivered(socket: Socket, payload: DeliveryAckPayload): vo
       overallStatus,
     };
 
-    io.emit('message:delivery:update', statusUpdate);
+    global.__socketIO.emit('message:delivery:update', statusUpdate);
 
     // Also broadcast the full updated message for dashboard to update its state
     if (message) {
-      io.emit('message:updated', { message });
+      global.__socketIO.emit('message:updated', { message });
     }
   }
 
@@ -295,25 +304,25 @@ function clearDeviceTimeout(deviceId: string): void {
  * Broadcast the current device list to all connected clients
  */
 function broadcastDeviceList(): void {
-  if (!io) return;
+  if (!global.__socketIO) return;
 
   const devices = getDevices();
-  io.emit('devices:update', { devices });
+  global.__socketIO.emit('devices:update', { devices });
 }
 
 /**
  * Get the Socket.io server instance
  */
 export function getSocketServer(): Server | null {
-  return io;
+  return global.__socketIO;
 }
 
 /**
  * Emit an event to a specific device
  */
 export function emitToDevice(deviceId: string, event: string, data: unknown): void {
-  if (io) {
-    io.to(`device:${deviceId}`).emit(event, data);
+  if (global.__socketIO) {
+    global.__socketIO.to(`device:${deviceId}`).emit(event, data);
   }
 }
 
@@ -321,7 +330,7 @@ export function emitToDevice(deviceId: string, event: string, data: unknown): vo
  * Emit an event to all connected clients
  */
 export function emitToAll(event: string, data: unknown): void {
-  if (io) {
-    io.emit(event, data);
+  if (global.__socketIO) {
+    global.__socketIO.emit(event, data);
   }
 }
