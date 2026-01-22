@@ -1,7 +1,7 @@
 'use client';
 
 import { ReactNode } from 'react';
-import { ToastProvider } from '@/contexts';
+import { ToastProvider, SocketProvider } from '@/contexts';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 
 interface ClientProvidersProps {
@@ -11,7 +11,9 @@ interface ClientProvidersProps {
 export function ClientProviders({ children }: ClientProvidersProps) {
   return (
     <ErrorBoundary>
-      <ToastProvider>{children}</ToastProvider>
+      <SocketProvider>
+        <ToastProvider>{children}</ToastProvider>
+      </SocketProvider>
     </ErrorBoundary>
   );
 }
