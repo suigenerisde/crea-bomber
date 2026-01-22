@@ -17,6 +17,8 @@ import {
   validateEnum,
   safeJsonParse,
 } from '@/lib/errors';
+import { getCurrentUser } from '@/lib/auth/getUser';
+import { canManage } from '@/lib/auth';
 
 const MAX_NAME_LENGTH = 100;
 const MAX_HOSTNAME_LENGTH = 255;
@@ -145,6 +147,15 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 
 export async function DELETE(request: NextRequest, { params }: RouteParams) {
   try {
+    // Check authentication and permission
+    const user = await getCurrentUser();
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    if (!canManage(user.role)) {
+      return NextResponse.json({ error: 'Forbidden - Admin role required' }, { status: 403 });
+    }
+
     const { id } = await params;
     const existingDevice = getDevice(id);
 

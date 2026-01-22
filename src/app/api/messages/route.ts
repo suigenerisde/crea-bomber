@@ -5,7 +5,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { db, getMessage } from '@/lib/db';
+import { db, getMessage, createMessageDeliveries, updateMessageStatus } from '@/lib/db';
 import { v4 as uuidv4 } from 'uuid';
 import type { Message, MessageRow, MessageType, MessageStatus, MessageDeliveryRow, MessageDelivery, DeviceDeliveryStatus } from '@/types';
 import {
@@ -21,6 +21,9 @@ import {
   validationResultToError,
   safeJsonParse,
 } from '@/lib/errors';
+import { getCurrentUser } from '@/lib/auth/getUser';
+import { canSend } from '@/lib/auth';
+import { getSocketServer } from '@/lib/socket-server';
 
 // Valid message types
 const VALID_MESSAGE_TYPES = ['TEXT', 'TEXT_IMAGE', 'VIDEO', 'AUDIO'] as const;
@@ -200,6 +203,15 @@ interface CreateMessageBody {
 
 export async function POST(request: NextRequest) {
   try {
+    // Check authentication and permission
+    const user = await getCurrentUser();
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    if (!canSend(user.role)) {
+      return NextResponse.json({ error: 'Forbidden - Sender or Admin role required' }, { status: 403 });
+    }
+
     // Parse JSON body safely
     const { data: body, error: parseError } =
       await safeJsonParse<CreateMessageBody>(request);
@@ -283,6 +295,33 @@ export async function POST(request: NextRequest) {
 
     if (!message) {
       throw new DatabaseError('Message was created but could not be retrieved');
+    }
+
+    // Create delivery records for each target device
+    createMessageDeliveries(id, targetDevices, 'sent');
+
+    // Broadcast message to target devices via WebSocket
+    const io = getSocketServer();
+    if (io) {
+      for (const deviceId of targetDevices) {
+        io.to(`device:${deviceId}`).emit('message:receive', {
+          id: message.id,
+          type,
+          content,
+          targetDevices,
+          imageUrl,
+          videoUrl,
+          audioUrl,
+          audioAutoplay,
+          timestamp: now,
+        });
+      }
+      // Update message status to sent
+      updateMessageStatus(id, 'sent');
+      message.status = 'sent';
+      console.log(`[API] Message ${id} broadcasted to ${targetDevices.length} devices`);
+    } else {
+      console.warn('[API] Socket server not available, message saved but not broadcasted');
     }
 
     return NextResponse.json({ message }, { status: 201 });

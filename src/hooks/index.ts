@@ -16,3 +16,4 @@ export {
   type KeyboardShortcut,
 } from './useKeyboardShortcuts';
 export { useScheduledMessages, type UseScheduledMessagesResult } from './useScheduledMessages';
+export { useAuth, type AuthState } from './useAuth';

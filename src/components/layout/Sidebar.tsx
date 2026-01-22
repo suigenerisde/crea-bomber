@@ -4,7 +4,9 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { clsx } from 'clsx';
 import { createClient } from '@/lib/supabase/client';
-import { LogOut } from 'lucide-react';
+import { LogOut, Shield, Users } from 'lucide-react';
+import { useAuth } from '@/hooks';
+import { ROLE_LABELS } from '@/lib/auth';
 
 interface NavItem {
   href: string;
@@ -63,12 +65,26 @@ const navItems: NavItem[] = [
 export function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
+  const { user, canManage } = useAuth();
 
   const handleLogout = async () => {
     const supabase = createClient();
     await supabase.auth.signOut();
     router.push('/login');
     router.refresh();
+  };
+
+  // Role badge color
+  const getRoleBadgeClass = () => {
+    if (!user) return 'bg-slate-600 text-slate-300';
+    switch (user.role) {
+      case 'admin':
+        return 'bg-purple-500/20 text-purple-400 border border-purple-500/30';
+      case 'sender':
+        return 'bg-blue-500/20 text-blue-400 border border-blue-500/30';
+      default:
+        return 'bg-slate-600/50 text-slate-400 border border-slate-500/30';
+    }
   };
 
   return (
@@ -110,8 +126,37 @@ export function Sidebar() {
         </ul>
       </nav>
 
+      {/* Admin Section (only for admins) */}
+      {canManage && (
+        <div className="px-3 py-2 border-t border-slate-700">
+          <Link
+            href="/admin/users"
+            className={clsx(
+              'flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors',
+              pathname === '/admin/users'
+                ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30'
+                : 'text-slate-400 hover:bg-slate-700 hover:text-white'
+            )}
+          >
+            <Users className="w-5 h-5" />
+            <span className="font-medium">User-Verwaltung</span>
+          </Link>
+        </div>
+      )}
+
       {/* Footer */}
       <div className="px-3 py-4 border-t border-slate-700 space-y-3">
+        {/* User info with role badge */}
+        {user && (
+          <div className="flex items-center justify-between px-3 py-2">
+            <span className="text-sm text-slate-400 truncate max-w-[120px]" title={user.email}>
+              {user.email.split('@')[0]}
+            </span>
+            <span className={clsx('text-xs px-2 py-0.5 rounded-full', getRoleBadgeClass())}>
+              {ROLE_LABELS[user.role]}
+            </span>
+          </div>
+        )}
         <button
           onClick={handleLogout}
           className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-400 hover:bg-slate-700 hover:text-white transition-colors"

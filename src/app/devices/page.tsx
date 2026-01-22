@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { clsx } from 'clsx';
-import { useSocket, useDevices, useSoundNotification } from '@/hooks';
+import { useSocket, useDevices, useSoundNotification, useAuth } from '@/hooks';
 import { DeviceList, DeviceDetailModal } from '@/components/devices';
 import { Button, PageTransition, DeviceListSkeleton } from '@/components/ui';
 import { useToast } from '@/contexts';
@@ -23,6 +23,7 @@ export default function DevicesPage() {
   const { devices, loading, error, refresh, onlineCount, offlineCount } = useDevices({
     socket,
   });
+  const { canManage } = useAuth();
 
   const [activeFilter, setActiveFilter] = useState<FilterTab>('all');
   const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
@@ -203,7 +204,7 @@ export default function DevicesPage() {
             device={selectedDevice}
             isOpen={!!selectedDevice}
             onClose={() => setSelectedDevice(null)}
-            onRemove={handleRemoveDevice}
+            onRemove={canManage ? handleRemoveDevice : undefined}
           />
         )}
       </div>

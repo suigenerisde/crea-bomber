@@ -6,11 +6,13 @@ import { MessageComposer, MessageComposerRef, MessageData } from '@/components/m
 import { PreviewModal } from '@/components/preview';
 import { DeviceSelector } from '@/components/devices';
 import { Card, Badge, PageTransition, SuccessAnimation, SkeletonDeviceCard } from '@/components/ui';
-import { useSocket, useDevices, useMessages, useSoundNotification, useKeyboardShortcuts } from '@/hooks';
+import { AccessDenied } from '@/components/ui/AccessDenied';
+import { useSocket, useDevices, useMessages, useSoundNotification, useKeyboardShortcuts, useAuth } from '@/hooks';
 import { useToast } from '@/contexts';
 import { BroadcastToggle, DeviceStatusPanel } from '@/components/devices';
 
 export default function ComposePage() {
+  const { canSend: userCanSend, loading: authLoading } = useAuth();
   const router = useRouter();
   const composerRef = useRef<MessageComposerRef>(null);
   const toast = useToast();
@@ -118,6 +120,18 @@ export default function ComposePage() {
 
   // Combined loading state
   const isLoading = isSending || creating;
+
+  // Permission check - show AccessDenied if user can't send
+  if (!authLoading && !userCanSend) {
+    return (
+      <PageTransition>
+        <AccessDenied
+          message="Du hast keine Berechtigung zum Senden von Nachrichten."
+          requiredRole="Sender oder Admin"
+        />
+      </PageTransition>
+    );
+  }
 
   return (
     <PageTransition>

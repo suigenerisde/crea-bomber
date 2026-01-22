@@ -3,22 +3,22 @@
 import type { ReactNode } from 'react';
 import { Sidebar } from './Sidebar';
 import { Header } from './Header';
-
-type ConnectionStatus = 'connected' | 'disconnected' | 'connecting';
+import { useSocket } from '@/hooks/useSocket';
 
 interface MainLayoutProps {
   children: ReactNode;
   title?: string;
-  connectionStatus?: ConnectionStatus;
   headerActions?: ReactNode;
 }
 
 export function MainLayout({
   children,
   title = 'Dashboard',
-  connectionStatus = 'disconnected',
   headerActions,
 }: MainLayoutProps) {
+  const { status } = useSocket();
+  // Map 'reconnecting' to 'connecting' for Header component
+  const connectionStatus = status === 'reconnecting' ? 'connecting' : status;
   return (
     <div className="min-h-screen bg-slate-900">
       {/* Sidebar */}

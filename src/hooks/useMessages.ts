@@ -263,20 +263,8 @@ export function useMessages(options: UseMessagesOptions = { socket: null }): Use
           setPagination((prev) => ({ ...prev, total: prev.total + 1 }));
         }
 
-        // If socket is connected, emit the message to devices
-        if (socket?.connected) {
-          socket.emit('message:send', {
-            id: newMessage.id,
-            type: payload.type,
-            content: payload.content,
-            targetDevices: payload.targetDevices,
-            imageUrl: payload.imageUrl,
-            videoUrl: payload.videoUrl,
-            audioUrl: payload.audioUrl,
-            audioAutoplay: payload.audioAutoplay,
-            timestamp: newMessage.createdAt.getTime(),
-          });
-        }
+        // Note: Server now handles WebSocket broadcast directly in the API route
+        // No need to emit 'message:send' from client anymore
 
         return newMessage;
       } catch (err) {
