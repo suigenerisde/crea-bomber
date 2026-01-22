@@ -42,7 +42,7 @@ for i in "${!DEVICE_IDS[@]}"; do
     echo "Building: $DEVICE_NAME ($DEVICE_ID)"
     echo "----------------------------------------"
 
-    # Create device-config.json for this build
+    # Create device-config.json for this build (will be picked up by extraResources)
     cat > device-config.json << EOF
 {
   "deviceId": "$DEVICE_ID",
@@ -59,9 +59,7 @@ EOF
 
     npx electron-builder --mac \
         --config.productName="$PRODUCT_NAME" \
-        --config.mac.identity=null \
-        --config.extraResources.0.from=device-config.json \
-        --config.extraResources.0.to=device-config.json
+        --config.mac.identity=null
 
     # Find and rename the output DMG
     DMG_FILE=$(find release -maxdepth 1 -name "*.dmg" -newer device-config.json 2>/dev/null | head -1)
