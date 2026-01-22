@@ -55,3 +55,4 @@ next-env.d.ts
 # PM2 logs (keep .gitkeep)
 /logs/*.log
 !/logs/.gitkeep
+client/device-config.json
