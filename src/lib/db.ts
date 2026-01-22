@@ -58,6 +58,7 @@ db.exec(`
     audio_autoplay INTEGER DEFAULT 0,
     target_devices TEXT NOT NULL,
     status TEXT DEFAULT 'pending',
+    sender_id TEXT,
     created_at INTEGER NOT NULL
   );
 
@@ -77,6 +78,13 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_deliveries_message ON message_deliveries(message_id);
   CREATE INDEX IF NOT EXISTS idx_deliveries_device ON message_deliveries(device_id);
 `);
+
+// Migration: Add sender_id column if it doesn't exist (for existing databases)
+try {
+  db.exec(`ALTER TABLE messages ADD COLUMN sender_id TEXT`);
+} catch {
+  // Column already exists, ignore
+}
 
 // Helper: Convert DeviceRow to Device
 function rowToDevice(row: DeviceRow): Device {
@@ -102,6 +110,7 @@ function rowToMessage(row: MessageRow): Message {
     audioAutoplay: row.audio_autoplay === 1,
     targetDevices: JSON.parse(row.target_devices),
     status: row.status as MessageStatus,
+    senderId: row.sender_id ?? undefined,
     createdAt: new Date(row.created_at),
   };
 }
@@ -222,6 +231,47 @@ export function getMessage(id: string): Message | null {
   return row ? rowToMessage(row) : null;
 }
 
+/**
+ * Get messages filtered by sender (for role-based access)
+ * @param senderId - If provided, only return messages from this sender
+ * @param limit - Maximum number of messages to return
+ */
+export function getMessagesBySender(senderId: string, limit = 100): Message[] {
+  const stmt = db.prepare(
+    'SELECT * FROM messages WHERE sender_id = ? ORDER BY created_at DESC LIMIT ?'
+  );
+  const rows = stmt.all(senderId, limit) as MessageRow[];
+  return rows.map(rowToMessage);
+}
+
+/**
+ * Get messages with deliveries filtered by sender
+ */
+export function getMessagesBySenderWithDeliveries(senderId: string, limit = 100): Message[] {
+  const messages = getMessagesBySender(senderId, limit);
+
+  const messageIds = messages.map(m => m.id);
+  if (messageIds.length === 0) return messages;
+
+  const placeholders = messageIds.map(() => '?').join(',');
+  const stmt = db.prepare(`SELECT * FROM message_deliveries WHERE message_id IN (${placeholders})`);
+  const rows = stmt.all(...messageIds) as MessageDeliveryRow[];
+
+  const deliveriesByMessage = new Map<string, MessageDelivery[]>();
+  for (const row of rows) {
+    const delivery = rowToDelivery(row);
+    const existing = deliveriesByMessage.get(row.message_id) || [];
+    existing.push(delivery);
+    deliveriesByMessage.set(row.message_id, existing);
+  }
+
+  for (const message of messages) {
+    message.deliveries = deliveriesByMessage.get(message.id) || [];
+  }
+
+  return messages;
+}
+
 export function createMessage(
   type: MessageType,
   content: string,
@@ -231,14 +281,15 @@ export function createMessage(
     videoUrl?: string;
     audioUrl?: string;
     audioAutoplay?: boolean;
+    senderId?: string;
   }
 ): Message {
   const id = uuidv4();
   const now = Date.now();
 
   const stmt = db.prepare(`
-    INSERT INTO messages (id, type, content, image_url, video_url, audio_url, audio_autoplay, target_devices, status, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)
+    INSERT INTO messages (id, type, content, image_url, video_url, audio_url, audio_autoplay, target_devices, status, sender_id, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)
   `);
 
   stmt.run(
@@ -250,6 +301,7 @@ export function createMessage(
     options?.audioUrl ?? null,
     options?.audioAutoplay ? 1 : 0,
     JSON.stringify(targetDevices),
+    options?.senderId ?? null,
     now
   );
 
@@ -263,6 +315,7 @@ export function createMessage(
     audioAutoplay: options?.audioAutoplay,
     targetDevices,
     status: 'pending',
+    senderId: options?.senderId,
     createdAt: new Date(now),
   };
 }

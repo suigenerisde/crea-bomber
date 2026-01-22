@@ -22,7 +22,7 @@ import {
   safeJsonParse,
 } from '@/lib/errors';
 import { getCurrentUser } from '@/lib/auth/getUser';
-import { canSend } from '@/lib/auth';
+import { canSend, canManage } from '@/lib/auth';
 import { getSocketServer } from '@/lib/socket-server';
 
 // Valid message types
@@ -53,6 +53,7 @@ function rowToMessage(row: MessageRow): Message {
     audioAutoplay: row.audio_autoplay === 1,
     targetDevices: JSON.parse(row.target_devices),
     status: row.status as MessageStatus,
+    senderId: row.sender_id ?? undefined,
     createdAt: new Date(row.created_at),
   };
 }
@@ -110,6 +111,25 @@ function validateQueryParams(searchParams: URLSearchParams): {
 
 export async function GET(request: NextRequest) {
   try {
+    // Check authentication
+    const user = await getCurrentUser();
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Viewers see no messages
+    if (!canSend(user.role)) {
+      return NextResponse.json({
+        messages: [],
+        pagination: {
+          total: 0,
+          limit: 20,
+          offset: 0,
+          hasMore: false,
+        },
+      });
+    }
+
     const { searchParams } = new URL(request.url);
     const { limit, offset, type, search, error: queryError } =
       validateQueryParams(searchParams);
@@ -122,6 +142,12 @@ export async function GET(request: NextRequest) {
     let sql = 'SELECT * FROM messages';
     const conditions: string[] = [];
     const params: (string | number)[] = [];
+
+    // Admins see all messages, Senders see only their own
+    if (!canManage(user.role)) {
+      conditions.push('sender_id = ?');
+      params.push(user.id);
+    }
 
     if (type) {
       conditions.push('type = ?');
@@ -272,8 +298,8 @@ export async function POST(request: NextRequest) {
 
     try {
       const stmt = db.prepare(`
-        INSERT INTO messages (id, type, content, image_url, video_url, audio_url, audio_autoplay, target_devices, status, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)
+        INSERT INTO messages (id, type, content, image_url, video_url, audio_url, audio_autoplay, target_devices, status, sender_id, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)
       `);
 
       stmt.run(
@@ -285,6 +311,7 @@ export async function POST(request: NextRequest) {
         audioUrl ?? null,
         audioAutoplay ? 1 : 0,
         JSON.stringify(targetDevices),
+        user.id,
         now
       );
     } catch (dbError) {

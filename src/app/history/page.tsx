@@ -3,9 +3,10 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { clsx } from 'clsx';
 import { Search } from 'lucide-react';
-import { useSocket, useDevices, useMessages } from '@/hooks';
+import { useSocket, useDevices, useMessages, useAuth } from '@/hooks';
 import { MessageHistoryList, MessageDetailModal } from '@/components/history';
 import { Button, Input, Select, PageTransition, MessageListSkeleton } from '@/components/ui';
+import { AccessDenied } from '@/components/ui/AccessDenied';
 import { useToast } from '@/contexts';
 import { MessageType, type Message } from '@/types';
 
@@ -18,10 +19,23 @@ const MESSAGE_TYPE_OPTIONS = [
 ];
 
 export default function HistoryPage() {
+  const { canSend: userCanSend, loading: authLoading } = useAuth();
   const toast = useToast();
   const { socket, status: socketStatus, isConnected } = useSocket();
   const { devices } = useDevices({ socket });
   const wasConnectedRef = useRef(true);
+
+  // Permission check - Viewers have no access to message history
+  if (!authLoading && !userCanSend) {
+    return (
+      <PageTransition>
+        <AccessDenied
+          message="Du hast keinen Zugriff auf die Nachrichten-Historie."
+          requiredRole="Sender oder Admin"
+        />
+      </PageTransition>
+    );
+  }
 
   // Show warning toast when connection is lost
   useEffect(() => {

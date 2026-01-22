@@ -50,6 +50,7 @@ export interface Message {
   audioAutoplay?: boolean;
   targetDevices: string[];
   status: MessageStatus;
+  senderId?: string;
   deliveries?: MessageDelivery[];
   createdAt: Date;
 }
@@ -94,6 +95,7 @@ export interface MessageRow {
   audio_autoplay: number;
   target_devices: string;
   status: string;
+  sender_id: string | null;
   created_at: number;
 }
 
